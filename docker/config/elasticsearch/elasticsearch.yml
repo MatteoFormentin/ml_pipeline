@@ -1,0 +1,8 @@
+# Elasticsearch configuration file
+cluster.name: "docker-cluster"
+network.host: 0.0.0.0
+
+# Sets to true and uncommemnt to enable password access
+# Sets also default user and password into compose file
+xpack.security.enabled: false
+#xpack.license.self_generated.type: "basic"
