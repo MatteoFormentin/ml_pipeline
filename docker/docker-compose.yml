@@ -1,3 +1,5 @@
+#TODO: Fix zookeper enabling persistence else kfka will not connect
+
 version: "3.8"
 services:
   # ELASTICSEARCH - cannot be scaled due to volume sharing problem
@@ -44,7 +46,7 @@ services:
       - cont-net
 
   # LOGSTASH can be scaled if every istance share the same pipelines
-  ls01: 
+  ls01:
     image: docker.elastic.co/logstash/logstash:7.11.1
     volumes:
       # Configuration file
@@ -74,6 +76,8 @@ services:
       - "2181:2181"
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper-data/bitnami/zookeeper
     networks:
       - cont-net
 
@@ -104,7 +108,7 @@ services:
       - cont-net
 
   # SPARK
-  spark: #Master - only one
+  spark: # Master - only one
     image: docker.io/bitnami/spark:3-debian-10
     environment:
       - SPARK_MODE=master
@@ -115,7 +119,7 @@ services:
     ports:
       - "8080:8080" #only webui accessible from outside
 
-  spark-worker: # Worker: can be scaled undefenitly 
+  spark-worker: # Worker: can be scaled
     image: docker.io/bitnami/spark:3-debian-10
     scale: 2 # Number of worker instances
     environment:
@@ -128,10 +132,30 @@ services:
       - SPARK_LOCAL_STORAGE_ENCRYPTION_ENABLED=no
       - SPARK_SSL_ENABLED=no
 
+  zeppelin: # Notebook executor
+    image: docker.io/apache/zeppelin:0.9.0
+    environment:
+      - ZEPPELIN_NOTEBOOK_DIR=/opt/zeppelin/notebook
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/zeppelin/conf/
+        target: /opt/zeppelin/conf/
+      # Data persistence
+      - type: volume
+        source: zeppelin-notebook
+        target: /opt/zeppelin/notebook
+    ports:
+      - "8081:8080" #only webui accessible from outside
+
 volumes:
   es01-data:
     driver: local
+  zookeeper-data:
+    driver: local
   kafka01-data:
+    driver: local
+  zeppelin-notebook:
     driver: local
 
 networks:
