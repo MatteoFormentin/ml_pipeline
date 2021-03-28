@@ -10,12 +10,12 @@ import os.path
 from kafka import KafkaProducer
 import time
 
-INPUT_CSV = "/Users/matteo/Desktop/1952.csv"
+INPUT_CSV = "/Users/matteo/Desktop/37.csv"
 KAFKA_BROKER = "localhost:9093"
-KAFKA_TOPIC = "test"
-INTERVAL = 0.000001  # Seconds
+KAFKA_TOPIC = "siae-pm"
+INTERVAL = 1  # Seconds
 
-producer = KafkaProducer(bootstrap_servers=[KAFKA_BROKER])
+producer = KafkaProducer(bootstrap_servers=[KAFKA_BROKER], acks="all") #IMPORTANT: sets acks to "all" in order to avoid data missing in case of errors
 
 df = pd.read_csv(INPUT_CSV)
 total_log = len(df.index)

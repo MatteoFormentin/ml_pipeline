@@ -43,7 +43,7 @@ services:
     networks:
       - cont-net
 
-  # LOGSTASH can be scaled if every istance share the same pipelines
+  # LOGSTASH - Can be scaled if every istance share the same pipelines
   ls01:
     image: docker.elastic.co/logstash/logstash:7.11.1
     volumes:
@@ -83,8 +83,8 @@ services:
     image: "bitnami/kafka:latest"
     environment:
       - KAFKA_BROKER_ID=1
-      #In order to use internal and external clients to access Kafka brokers you need 
-      #to configure one listener for each kind of clients.
+      # In order to use internal and external clients to access Kafka brokers you need
+      # to configure one listener for each kind of clients.
       # Internal: kafka01:9092 change CLIENT://kafka01:909
       # External: localhost:9093 #Change if IP public EXTERNAL://localhost:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
@@ -92,7 +92,6 @@ services:
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka01:9092,EXTERNAL://localhost:9093
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
-
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
     volumes:
