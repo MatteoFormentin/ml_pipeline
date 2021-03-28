@@ -1,5 +1,3 @@
-#TODO: Fix zookeper enabling persistence else kfka will not connect
-
 version: "3.8"
 services:
   # ELASTICSEARCH - cannot be scaled due to volume sharing problem
@@ -77,7 +75,7 @@ services:
     environment:
       - ALLOW_ANONYMOUS_LOGIN=yes
     volumes:
-      - zookeeper-data/bitnami/zookeeper
+      - zookeeper-data:/bitnami/zookeeper
     networks:
       - cont-net
 
@@ -85,12 +83,22 @@ services:
     image: "bitnami/kafka:latest"
     environment:
       - KAFKA_BROKER_ID=1
-      - KAFKA_LISTENERS=PLAINTEXT://:9092
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://127.0.0.1:9092
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      #In order to use internal and external clients to access Kafka brokers you need 
+      #to configure one listener for each kind of clients.
+      # Internal: kafka01:9092 change CLIENT://kafka01:909
+      # External: localhost:9093 #Change if IP public EXTERNAL://localhost:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka01:9092,EXTERNAL://localhost:9093
+      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
     volumes:
       - kafka01-data:/bitnami/kafka
+    ports:
+      - "9093:9093"
     networks:
       - cont-net
 
@@ -146,7 +154,7 @@ services:
         source: zeppelin-notebook
         target: /opt/zeppelin/notebook
     ports:
-      - "8081:8080" #only webui accessible from outside
+      - "8081:8080" # Only webui accessible from outside
 
 volumes:
   es01-data:
