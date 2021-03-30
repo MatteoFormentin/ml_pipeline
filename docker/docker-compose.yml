@@ -86,7 +86,7 @@ services:
       # In order to use internal and external clients to access Kafka brokers you need
       # to configure one listener for each kind of clients.
       # Internal: kafka01:9092 change CLIENT://kafka01:909
-      # External: localhost:9093 #Change if IP public EXTERNAL://localhost:9093
+      # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093

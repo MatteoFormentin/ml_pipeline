@@ -1,0 +1,9 @@
+FROM python:slim
+
+COPY ./netsim /simulator/netsim
+WORKDIR /simulator
+RUN mkdir log
+
+RUN pip3 install pandas kafka-python
+
+CMD python3 /simulator/netsim simulate /simulator/log ${KAFKA_BROKER} ${KAFKA_TOPIC} 
