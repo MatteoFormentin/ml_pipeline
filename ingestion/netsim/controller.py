@@ -6,6 +6,7 @@ import sys
 
 from csv_splitter import split_csv
 from producer import Producer
+import datetime
 
 REFRESH_RATE = 1
 
@@ -36,6 +37,7 @@ class Controller():
             self.kafka_topic = args.kafka_topic
             self.input_folder = args.input_folder
             self.interval = args.interval
+            starting_time = datetime.datetime.now()
             if args.limit:
                 self.limit = args.limit
             else:
@@ -44,7 +46,7 @@ class Controller():
                 print("Spawning producers...")
                 self.runProducers()
                 print("Spawned producers: %d" % len(self.producers))
-            except kafka.errors.NoBrokersAvailable or kafka.errors.UnrecognizedBrokerVersion:
+            except kafka.errors:
                 print("No kafka brokers available. Retry.")
                 sys.exit(-1)
             total_log_processed = 0
@@ -59,8 +61,16 @@ class Controller():
 
                 print("Active producers: %d" % (len(self.producers)), end='\r')
 
-                time.sleep(0.1)
-            print("Simulation done. Injected %s Logs                                                      " % total_log_processed)
+                time.sleep(1)
+
+            # Calculate time elapsed
+            s = (datetime.datetime.now() - starting_time).seconds
+            hours = s // 3600
+            s = s - (hours * 3600)
+            minutes = s // 60
+            seconds = s - (minutes * 60)
+            print("Simulation done. Injected %s Logs. Took %d hours %d minutes %d seconds                                     " % (
+                total_log_processed, hours, minutes, seconds))
 
         # Check if required splitting
         elif args.command == "split":

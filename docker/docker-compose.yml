@@ -2,7 +2,8 @@ version: "3.8"
 services:
   # ELASTICSEARCH - cannot be scaled due to volume sharing problem
   es01:
-    image: docker.elastic.co/elasticsearch/elasticsearch:7.11.1
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+    hostname: es01
     environment:
       #- "ELASTICSEARCH_USERNAME=elastic"
       #- "ELASTIC_PASSWORD=password"
@@ -31,7 +32,8 @@ services:
 
   # KIBANA
   kib01:
-    image: docker.elastic.co/kibana/kibana:7.11.1
+    image: docker.elastic.co/kibana/kibana:7.12.0
+    hostname: kib01
     volumes:
       # Configuration file
       - type: bind
@@ -45,7 +47,7 @@ services:
 
   # LOGSTASH - Can be scaled if every istance share the same pipelines
   ls01:
-    image: docker.elastic.co/logstash/logstash:7.11.1
+    image: docker.elastic.co/logstash/logstash:7.12.0
     volumes:
       # Configuration file
       - type: bind
@@ -67,9 +69,27 @@ services:
     networks:
       - cont-net
 
+  # METRICBEAT - Collect metrics about pipeline adn store it in elasticsearch
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:7.12.0
+    hostname: metricbeat
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/metricbeat/metricbeat.yml
+        target: /usr/share/metricbeat/metricbeat.yml
+        read_only: true
+      # Pipeline -> put each pipeline in this folder in a separate file
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - cont-net
+
   # KAFKA - Requires Zookeper to works and CMAK for gui management (optional)
   zookeeper:
     image: "bitnami/zookeeper:latest"
+    hostname: zookeeper
     ports:
       - "2181:2181"
     environment:
@@ -81,11 +101,12 @@ services:
 
   kafka01: # if external access required expose 9092
     image: "bitnami/kafka:latest"
+    hostname: kafka01
     environment:
       - KAFKA_BROKER_ID=1
       # In order to use internal and external clients to access Kafka brokers you need
       # to configure one listener for each kind of clients.
-      # Internal: kafka01:9092 change CLIENT://kafka01:909
+      # Internal: kafka01:9092 change CLIENT://kafka01:9092
       # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
@@ -94,8 +115,12 @@ services:
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
     volumes:
       - kafka01-data:/bitnami/kafka
+      - type: bind
+        source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar
+        target: /usr/share/jolokia-jvm-1.6.1-agent.jar
     ports:
       - "9093:9093"
     networks:

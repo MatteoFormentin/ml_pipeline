@@ -1,0 +1,74 @@
+metricbeat.config:
+  modules:
+    path: ${path.config}/modules.d/*.yml
+    # Reload module configs as they change:
+    reload.enabled: true
+
+metricbeat.modules:
+- module: docker
+  metricsets:
+    - "container"
+    - "cpu"
+    - "diskio"
+    - "healthcheck"
+    - "info"
+    #- "image"
+    - "memory"
+    - "network"
+  hosts: ["unix:///var/run/docker.sock"]
+  period: 10s
+  enabled: false
+
+- module: elasticsearch
+  xpack.enabled: true
+  period: 10s
+  hosts: ["http://es01:9200"]
+
+- module: logstash
+  metricsets:
+    - node
+    - node_stats
+  period: 10s
+  hosts: ["ls01:9600"]
+  xpack.enabled: true
+
+- module: kibana
+  metricsets:
+    - stats
+  period: 10s
+  hosts: ["kib01:5601"]
+  xpack.enabled: true
+
+- module: zookeeper
+  enabled: true
+  metricsets: ["mntr", "server"]
+  period: 10s
+  hosts: ["zookeeper:2181"]
+
+- module: kafka
+  metricsets:
+    - consumergroup
+    - partition
+  period: 10s
+  hosts: ["kafka01:9092"]
+  client_id: metricbeat
+
+# Metrics collected from a Kafka broker using Jolokia
+- module: kafka
+  metricsets:
+    - broker
+    - consumer
+    - producer
+  period: 10s
+  hosts: ["kafka01:8778"]
+  
+
+output:
+  elasticsearch:
+    hosts: ["es01:9200"]
+    ilm.enabled: true
+    ilm.rollover_alias: "metricbeat"
+    ilm.pattern: "{now/d}-000001"
+
+setup.kibana.host: "http://kib01:5601"
+setup.dashboards.enabled: false #enable first time to load dashboards

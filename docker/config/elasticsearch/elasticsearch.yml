@@ -2,6 +2,9 @@
 cluster.name: "docker-cluster"
 network.host: 0.0.0.0
 
+xpack.monitoring.collection.enabled: true
+xpack.monitoring.elasticsearch.collection.enabled: false #legacy monitoring - useless since metricbeat
+
 # Sets to true and uncommemnt to enable password access
 # Sets also default user and password into compose file
 xpack.security.enabled: false
