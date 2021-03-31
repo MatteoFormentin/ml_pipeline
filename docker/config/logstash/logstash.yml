@@ -1,4 +1,4 @@
 # Logstash configuration
 http.host: "0.0.0.0"
-xpack.monitoring.elasticsearch.collection.enabled: false
-monitoring.enabled: false
+#xpack.monitoring.elasticsearch.collection.enabled: false
+#monitoring.enabled: false
