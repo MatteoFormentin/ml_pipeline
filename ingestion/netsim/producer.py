@@ -1,11 +1,10 @@
 import pandas as pd
-from kafka import KafkaProducer
 import time
 from threading import Thread
 
 
 class Producer(Thread):
-    def __init__(self, producer_id, csv_path, kafka_address, topic, interval):
+    def __init__(self, producer_id, csv_path, kafka_broker, topic, interval):
         Thread.__init__(self)
         self.run_flag = True
         self.producer_id = producer_id
@@ -15,8 +14,7 @@ class Producer(Thread):
         self.counter = 0
 
         # IMPORTANT: sets acks to "all" in order to avoid data missing in case of errors
-        self.kafka_broker = KafkaProducer(
-            bootstrap_servers=[kafka_address], acks="all")
+        self.kafka_broker = kafka_broker
 
     def run(self):
         #self.total_log = len(df.index)

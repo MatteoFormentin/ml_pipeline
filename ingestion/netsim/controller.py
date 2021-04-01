@@ -3,10 +3,12 @@ import os
 import time
 import kafka
 import sys
+from kafka import KafkaProducer
+import datetime
+
 
 from csv_splitter import split_csv
 from producer import Producer
-import datetime
 
 REFRESH_RATE = 1
 
@@ -42,13 +44,21 @@ class Controller():
                 self.limit = args.limit
             else:
                 self.limit = -1
+
             try:
-                print("Spawning producers...")
-                self.runProducers()
-                print("Spawned producers: %d" % len(self.producers))
+                print("Connecting to Kafka...")
+                self.kafka_broker = KafkaProducer(
+                    bootstrap_servers=[self.kafka_broker], acks="all")
+                print("Connected to Kafka")
             except kafka.errors:
                 print("No kafka brokers available. Retry.")
                 sys.exit(-1)
+
+            print("Spawning producers...")
+            self.runProducers()
+            print("Spawned producers: %d" % len(self.producers))
+
+
             total_log_processed = 0
             while not len(self.producers) == 0:
                 for p in self.producers:
