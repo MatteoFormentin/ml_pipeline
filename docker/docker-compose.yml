@@ -7,7 +7,10 @@ services:
     environment:
       #- "ELASTICSEARCH_USERNAME=elastic"
       #- "ELASTIC_PASSWORD=password"
-      - discovery.type=single-node
+      - node.name=es01
+      #- discovery.type=single-node #Only if single node
+      - discovery.seed_hosts=es02,es03
+      - cluster.initial_master_nodes=es01,es02,es03
       - bootstrap.memory_lock=true
       - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
@@ -27,6 +30,64 @@ services:
     ports:
       - 9200:9200
       - 9300:9300
+    networks:
+      - cont-net
+
+  es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+    hostname: es02
+    environment:
+      #- "ELASTICSEARCH_USERNAME=elastic"
+      #- "ELASTIC_PASSWORD=password"
+      - node.name=es02
+      #- discovery.type=single-node #Only if single nodecker
+      - discovery.seed_hosts=es01,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/elasticsearch/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      # Data persistence
+      - type: volume
+        source: es02-data
+        target: /usr/share/elasticsearch/data
+    networks:
+      - cont-net
+
+  es03:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+    hostname: es03
+    environment:
+      #- "ELASTICSEARCH_USERNAME=elastic"
+      #- "ELASTIC_PASSWORD=password"
+      - node.name=es03
+      #- discovery.type=single-node #Only if single node
+      - discovery.seed_hosts=es01,es02
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/elasticsearch/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      # Data persistence
+      - type: volume
+        source: es03-data
+        target: /usr/share/elasticsearch/data
     networks:
       - cont-net
 
@@ -126,19 +187,6 @@ services:
     networks:
       - cont-net
 
-  cmak: # Kafka webui - access with username password as credentials
-    image: hlebalbau/kafka-manager:stable
-    restart: always
-    command:
-      - "-Dcmak.zkhosts=zookeeper:2181"
-      - "-DbasicAuthentication.enabled=true"
-      - "-DbasicAuthentication.username=username"
-      - "-DbasicAuthentication.password=password"
-    ports:
-      - "9000:9000"
-    networks:
-      - cont-net
-
   # SPARK
   spark: # Master - only one
     image: docker.io/bitnami/spark:3-debian-10
@@ -182,6 +230,10 @@ services:
 
 volumes:
   es01-data:
+    driver: local
+  es02-data:
+    driver: local
+  es03-data:
     driver: local
   zookeeper-data:
     driver: local
