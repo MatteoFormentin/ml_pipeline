@@ -1,0 +1,26 @@
+FROM python:slim
+
+RUN mkdir /usr/share/man/man1/
+RUN apt-get update \
+    && apt-get install -y default-jre scala git wget procps \
+    && apt-get clean 
+
+RUN wget https://downloads.apache.org/spark/spark-3.1.1/spark-3.1.1-bin-hadoop2.7.tgz
+RUN tar xvf spark-*
+RUN mv spark-3.1.1-bin-hadoop2.7 /opt/spark
+
+RUN echo "export SPARK_HOME=/opt/spark" >> ~/.profile \
+    && echo "export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin" >> ~/.profile \
+    && echo "export PYSPARK_PYTHON=/usr/bin/python3" >> ~/.profile 
+
+RUN pip3 install scikit-learn joblibspark
+
+EXPOSE 7077
+EXPOSE 8080
+EXPOSE 8081
+
+RUN mkdir scripts
+COPY run.sh ./scripts
+RUN chmod +x ./scripts/run.sh
+
+CMD ./scripts/run.sh && sleep infinity

@@ -8,7 +8,7 @@ keyword:
 
 Coloumn description:
 idlink -> Identification of radio link
-area -> group differnet link together FIXED USELESS
+area -> group differet link together FIXED USELESS
 provider -> other group option FIXED USELESS
 ramo -> identify one of the two direction (1: A->B, 2: B->A) FIXED
 data -> timestamp of log

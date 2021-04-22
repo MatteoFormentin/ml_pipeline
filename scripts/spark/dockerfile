@@ -1,0 +1,5 @@
+FROM spark-app:3.1.1
+
+COPY spark_rdd_ex.py .
+
+CMD spark-submit --master spark://spark:7077  --jars 'elasticsearch-hadoop-7.12.0.jar'   --deploy-mode client spark_rdd_ex.py
