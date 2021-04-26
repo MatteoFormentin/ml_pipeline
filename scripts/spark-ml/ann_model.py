@@ -4,7 +4,7 @@ from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType
 import pandas as pd
 import numpy as np
-#from sklearn.externals import joblib
+# from sklearn.externals import joblib
 
 ES_HOST = "http://localhost"
 INDEX_NAME = "siae-pm"
@@ -63,83 +63,95 @@ schema = StructType([
     StructField("txminBN", FloatType(), True),
     StructField("rxmaxBN", FloatType(), True),
     StructField("rxminBN", FloatType(), True),
-    StructField("_metadata", MapType(StringType(), StringType(), True), True)])
+    StructField("_metadata", MapType(StringType(), StringType(), True), True)
+])
 
 columns = np.array(['idlink', 'ramo', 'IP_A', 'IP_B', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
                     'freqband', 'bandwidth',
                     'RxNominal', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
                     'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
                     'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
-                    'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN'])
+                    'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN', '_metadata'])
 
 
 # Input-> a dataframe that contains a group (one link), out-> windowed df
 @F.pandas_udf(schema, functionType=F.PandasUDFType.GROUPED_MAP)
 def make_window(df_grouped):
+    i=0
+    df_grouped['data'] = pd.to_datetime(df_grouped['data'], dayfirst=True) #Cast to datetime else cause problem with pyarrow
     chunksize = 3  # windows dim
     # Create a Dataframe explaining the 45-minutes window
     df_window = pd.DataFrame(data=None, columns=columns)
     for i in range(0, len(df_grouped)-2):  # Loop over the rows of the file
+        # iloc gets rows of dataframe
         chunk = df_grouped.iloc[range(i, i+chunksize)]
         chunk.index = range(0, chunksize)
+        # print(chunk.head())
         # check that the row in position 2 suffers at least one second of UAS
         if (chunk.iloc[0]['idlink'] == chunk.iloc[1]['idlink']) and (chunk.iloc[1]['idlink'] == chunk.iloc[2]['idlink']) \
                 and (chunk.iloc[2]['uas'] != 0) and (chunk.iloc[0]['ramo'] == chunk.iloc[1]['ramo']) \
                 and (chunk.iloc[1]['ramo'] == chunk.iloc[2]['ramo']):
+            i +=1
             # This wll also reorder the dataframe
-            data = [[chunk.iloc[0]['idlink'],
-                     chunk.iloc[0]['ramo'],
-                     chunk.iloc[0]['ip_a'],
-                     chunk.iloc[0]['ip_b'],
-                     chunk.iloc[0]['timestamp'],
-                     chunk.iloc[1]['timestamp'],
-                     chunk.iloc[2]['timestamp'],
-                     chunk.iloc[2]['eqtype'],
-                     chunk.iloc[2]['acmLowerMode'],
-                     chunk.iloc[2]['freqband'],
-                     chunk.iloc[2]['bandwidth'],
-                     chunk.iloc[0]['RxNominal'],
-                     chunk.iloc[2]['acmEngine'],
+            data = [[
+                chunk.iloc[0]['idlink'],
+                chunk.iloc[0]['ramo'],
+                chunk.iloc[0]['ip_a'],
+                chunk.iloc[0]['ip_b'],
+                chunk.iloc[0]['data'],
+                chunk.iloc[1]['data'],
+                chunk.iloc[2]['data'],
+                chunk.iloc[2]['eqtype'],
+                chunk.iloc[2]['acmLowerMode'],
+                chunk.iloc[2]['freqband'],
+                chunk.iloc[2]['bandwidth'],
+                chunk.iloc[0]['RxNominal'],
+                chunk.iloc[2]['acmEngine'],
 
-                     chunk.iloc[0]['es'],
-                     chunk.iloc[0]['ses'],
-                     chunk.iloc[0]['txMaxA'],
-                     chunk.iloc[0]['txminA'],
-                     chunk.iloc[0]['rxmaxA'],
-                     chunk.iloc[0]['rxminA'],
-                     chunk.iloc[0]['txMaxB'],
-                     chunk.iloc[0]['txminB'],
-                     chunk.iloc[0]['rxmaxB'],
-                     chunk.iloc[0]['rxminB'],
+                chunk.iloc[0]['es'],
+                chunk.iloc[0]['ses'],
+                chunk.iloc[0]['txMaxA'],
+                chunk.iloc[0]['txminA'],
+                chunk.iloc[0]['rxmaxA'],
+                chunk.iloc[0]['rxminA'],
+                chunk.iloc[0]['txMaxB'],
+                chunk.iloc[0]['txminB'],
+                chunk.iloc[0]['rxmaxB'],
+                chunk.iloc[0]['rxminB'],
 
-                     chunk.iloc[1]['es'],
-                     chunk.iloc[1]['ses'],
-                     chunk.iloc[1]['txMaxA'],
-                     chunk.iloc[1]['txminA'],
-                     chunk.iloc[1]['rxmaxA'],
-                     chunk.iloc[1]['rxminA'],
-                     chunk.iloc[1]['txMaxB'],
-                     chunk.iloc[1]['txminB'],
-                     chunk.iloc[1]['rxmaxB'],
-                     chunk.iloc[1]['rxminB'],
+                chunk.iloc[1]['es'],
+                chunk.iloc[1]['ses'],
+                chunk.iloc[1]['txMaxA'],
+                chunk.iloc[1]['txminA'],
+                chunk.iloc[1]['rxmaxA'],
+                chunk.iloc[1]['rxminA'],
+                chunk.iloc[1]['txMaxB'],
+                chunk.iloc[1]['txminB'],
+                chunk.iloc[1]['rxmaxB'],
+                chunk.iloc[1]['rxminB'],
 
-                     chunk.iloc[2]['es'],
-                     chunk.iloc[2]['ses'],
-                     chunk.iloc[2]['txMaxA'],
-                     chunk.iloc[2]['txminA'],
-                     chunk.iloc[2]['rxmaxA'],
-                     chunk.iloc[2]['rxminA'],
-                     chunk.iloc[2]['txMaxB'],
-                     chunk.iloc[2]['txminB'],
-                     chunk.iloc[2]['rxmaxB'],
-                     chunk.iloc[2]['rxminB']]]
-
-            df_window.append(data)
+                chunk.iloc[2]['es'],
+                chunk.iloc[2]['ses'],
+                chunk.iloc[2]['txMaxA'],
+                chunk.iloc[2]['txminA'],
+                chunk.iloc[2]['rxmaxA'],
+                chunk.iloc[2]['rxminA'],
+                chunk.iloc[2]['txMaxB'],
+                chunk.iloc[2]['txminB'],
+                chunk.iloc[2]['rxmaxB'],
+                chunk.iloc[2]['rxminB'],
+                chunk.iloc[0]['_metadata']
+            ]]
+            
+            wind = pd.DataFrame(data=data, columns=columns)
+            df_window = df_window.append(wind)
+    print("UAS LINE: ", end="")
+    print(i)
 
     return df_window
 
 
-df.orderBy(df.idlink.asc(), df.ramo, df.timestamp.desc()) \
+df.where(df.uas > 0).orderBy(df.idlink.asc(), df.ramo, df.data.desc()) \
     .groupBy(df.idlink) \
     .apply(make_window) \
     .show(truncate=False)
