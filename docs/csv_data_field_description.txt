@@ -37,3 +37,51 @@ acmUpperMode -> Highest (Fastest) modulation used in trasmission (Adaptive rate 
 acmEngine -> Identify is the ACM (Adaptive code modulation) is active (0/1). If active switch the MCS on the range defined by acmLowerMode and acmUpperMode
 freqband -> carrier frequency of the link FIXED
 bandwidth -> carrier bandwidth of the link FIXED
+
+
+
+'''
+StructType([
+    StructField("@timestamp", TimestampType()(), True),
+    StructField("@version", StringType()(), True),
+    StructField("RxNominal", LongType(), True),
+    StructField("acmEngine", LongType(), True),
+    StructField("acmLowerMode", StringType(), True),
+    StructField("acmMax", FloatType(), True),
+    StructField("acmSnA", FloatType(), True),
+    StructField("acmSnB", FloatType(), True),
+    StructField("acmUpperMode", StringType(), True),
+    StructField("area", LongType(), True),
+    StructField("bandwidth", FloatType(), True),
+    StructField("eqtype", LongType(), True),
+    StructField("es", LongType(), True),
+    StructField("freqband", FloatType(), True),
+    StructField("idlink", LongType(), True),
+    StructField("ip_a", StringType(), True),
+    StructField("ip_b", StringType(), True),
+    StructField("isG828Ok", LongType(), True),
+    StructField("isRxPwrOk", LongType(), True),
+    StructField("isTxPwrOk", LongType(), True),
+    StructField("protection", StringType(), True),
+    StructField("provider", LongType(), True),
+    StructField("ramo", LongType(), True),
+    StructField("rxRef", LongType(), True),
+    StructField("rxSnA", FloatType(), True),
+    StructField("rxSnB", FloatType(), True),
+    StructField("rxmaxA", FloatType(), True),
+    StructField("rxmaxB", FloatType(), True),
+    StructField("rxminA", FloatType(), True),
+    StructField("rxminB", FloatType(), True),
+    StructField("ses", LongType(), True),
+    StructField("snA", FloatType(), True),
+    StructField("snB", FloatType(), True),
+    StructField("timestamp", TimestampType(), True),
+    StructField("txMaxA", FloatType(), True),
+    StructField("txMaxB", FloatType(), True),
+    StructField("txRef", FloatType(), True),
+    StructField("txminA", FloatType(), True),
+    StructField("txminB", FloatType(), True),
+    StructField("uas", LongType(), True),
+    StructField("_metadata", MapType(StringType(), StringType(), True), True)])
+'''
+
