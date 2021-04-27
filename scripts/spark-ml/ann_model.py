@@ -19,6 +19,9 @@ reader = spark.read.format("org.elasticsearch.spark.sql").option("es.read.metada
     "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", "http://localhost")
 df = reader.load(INDEX_NAME)
 
+thr = spark.sparkContext.broadcast(pd.read_csv(
+    "scripts/spark-ml/Project_good_modulation.csv", low_memory=False))
+
 
 #  Windowed schema
 schema = StructType([
@@ -34,7 +37,6 @@ schema = StructType([
     # TODO: Is a string or a float?
     StructField("freqband", StringType(), True),
     StructField("bandwidth", FloatType(), True),
-    StructField("RxNominal", LongType(), True),
     StructField("acmEngine", LongType(), True),
     StructField("esN-2", LongType(), True),
     StructField("sesN-2", LongType(), True),
@@ -66,15 +68,23 @@ schema = StructType([
     StructField("txminBN", FloatType(), True),
     StructField("rxmaxBN", FloatType(), True),
     StructField("rxminBN", FloatType(), True),
+    StructField("lowthr", FloatType(), True), #TODO: Should be float-
+    StructField("ptx", LongType(), True),
+    StructField("RxNominal", LongType(), True),
+    StructField("Thr_min", LongType(), True),
+
+
+
     StructField("_metadata", MapType(StringType(), StringType(), True), True)
 ])
 
 columns = np.array(['idlink', 'ramo', 'IP_A', 'IP_B', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
-                    'freqband', 'bandwidth',
-                    'RxNominal', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
+                    'freqband', 'bandwidth', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
                     'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
                     'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
-                    'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN', '_metadata'])
+                    'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN',
+                    'lowthr', 'ptx', 'RxNominal', 'Thr_min',
+                    '_metadata'])
 
 
 # Input-> a dataframe that contains a group (one link), out-> windowed df
@@ -109,7 +119,6 @@ def make_window(df_grouped):
                 chunk.iloc[2]['acmLowerMode'],
                 chunk.iloc[2]['freqband'],
                 chunk.iloc[2]['bandwidth'],
-                chunk.iloc[0]['RxNominal'],
                 chunk.iloc[2]['acmEngine'],
 
                 chunk.iloc[0]['es'],
@@ -144,7 +153,10 @@ def make_window(df_grouped):
                 chunk.iloc[2]['txminB'],
                 chunk.iloc[2]['rxmaxB'],
                 chunk.iloc[2]['rxminB'],
-
+                None,  # lowthr
+                None,  # ptx
+                chunk.iloc[0]['RxNominal'],
+                None,  # Thr_min
                 chunk.iloc[0]['_metadata']
             ]]
 
@@ -173,63 +185,76 @@ def make_window(df_grouped):
             elif wind.iloc[0]['freqband'] == "6":
                 wind.at[0, 'freqband'] = "6U"
 
-            df_window = df_window.append(wind)
+            # Encode acmLowerMode in the windowed dataframe
+            if wind.iloc[0]['acmLowerMode'] == "BPSK-Normal":
+                wind.at[0, 'acmLowerMode'] = 0
 
-        # Encode acmLowerMode in the windowed dataframe
-        index = df_window.index[df_window['acmLowerMode'] == "BPSK-Normal"]
-        df_window.loc[index, 'acmLowerMode'] = 0
+            elif wind.iloc[0]['acmLowerMode'] == "4QAM-Strong" or wind.iloc[0]['acmLowerMode'] == "acm-4QAMs":
+                wind.at[0, 'acmLowerMode'] = 1
 
-        index = df_window.index[(df_window['acmLowerMode'] == "4QAM-Strong")
-                                | (df_window['acmLowerMode'] == "acm-4QAMs")]
-        df_window.loc[index, 'acmLowerMode'] = 1
+            elif wind.iloc[0]['acmLowerMode'] == "4QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-4QAM":
+                wind.at[0, 'acmLowerMode'] = 2
 
-        index = df_window.index[(df_window['acmLowerMode'] == "4QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-4QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 2
+            elif wind.iloc[0]['acmLowerMode'] == "8PSK-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-8PSK":
+                wind.at[0, 'acmLowerMode'] = 3
 
-        index = df_window.index[(df_window['acmLowerMode'] == "8PSK-Normal")
-                                | (df_window['acmLowerMode'] == "acm-8PSK")]
-        df_window.loc[index, 'acmLowerMode'] = 3
+            elif wind.iloc[0]['acmLowerMode'] == "16QAM-Strong" or wind.iloc[0]['acmLowerMode'] == "acm-16QAMs":
+                wind.at[0, 'acmLowerMode'] = 4
 
-        index = df_window.index[(df_window['acmLowerMode'] == "16QAM-Strong")
-                                | (df_window['acmLowerMode'] == "acm-16QAMs")]
-        df_window.loc[index, 'acmLowerMode'] = 4
+            elif wind.iloc[0]['acmLowerMode'] == "16QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-16QAM":
+                wind.at[0, 'acmLowerMode'] = 5
 
-        index = df_window.index[(df_window['acmLowerMode'] == "16QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-16QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 5
+            elif wind.iloc[0]['acmLowerMode'] == "32QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-32QAM":
+                wind.at[0, 'acmLowerMode'] = 6
 
-        index = df_window.index[(df_window['acmLowerMode'] == "32QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-32QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 6
+            elif wind.iloc[0]['acmLowerMode'] == "64QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-64QAM":
+                wind.at[0, 'acmLowerMode'] = 7
 
-        index = df_window.index[(df_window['acmLowerMode'] == "64QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-64QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 7
+            elif wind.iloc[0]['acmLowerMode'] == "128QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-128QAM":
+                wind.at[0, 'acmLowerMode'] = 8
 
-        index = df_window.index[(df_window['acmLowerMode'] == "128QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-128QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 8
+            elif wind.iloc[0]['acmLowerMode'] == "256QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-256QAM":
+                wind.at[0, 'acmLowerMode'] = 9
 
-        index = df_window.index[(df_window['acmLowerMode'] == "256QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-256QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 9
+            elif wind.iloc[0]['acmLowerMode'] == "512QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-512QAM":
+                wind.at[0, 'acmLowerMode'] = 10
 
-        index = df_window.index[(df_window['acmLowerMode'] == "512QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-512QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 10
+            elif wind.iloc[0]['acmLowerMode'] == "1024QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-1024QAM":
+                wind.at[0, 'acmLowerMode'] = 11
 
-        index = df_window.index[(df_window['acmLowerMode'] == "1024QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-1024QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 11
+            elif wind.iloc[0]['acmLowerMode'] == "2048QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-2048QAM":
+                wind.at[0, 'acmLowerMode'] = 12
 
-        index = df_window.index[(df_window['acmLowerMode'] == "2048QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-2048QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 12
+            elif wind.iloc[0]['acmLowerMode'] == "4096QAM-Normal" or wind.iloc[0]['acmLowerMode'] == "acm-4096QAM":
+                wind.at[0, 'acmLowerMode'] = 13
 
-        index = df_window.index[(df_window['acmLowerMode'] == "4096QAM-Normal")
-                                | (df_window['acmLowerMode'] == "acm-4096QAM")]
-        df_window.loc[index, 'acmLowerMode'] = 13
+            # Locate the rows in file that correspond to current equipment (x will contain indexes == position)
+            x = thr.value.index[(thr.value['EQTYPE'] == wind.iloc[0]['eqtype'])
+                                & (thr.value['FREQBAND'] == wind.iloc[0]['freqband'])
+                                & (thr.value['LOWERMOD'] == wind.iloc[0]['acmLowerMode'])
+                                & (thr.value['BANDWITDH'] == wind.iloc[0]['bandwidth'])].tolist()
+
+            if len(x) != 0:  # Check if there is a corrispondence in the project file (i can find at max one correspondence) -> if not discard record (not append)
+                # Take the maximum Tx power
+                # Assign the minimum Rx power threshold
+                wind.at[0, 'lowthr'] = float(thr.value['PTH'][x])
+                # Assign the maximum Tx power
+                wind.at[0, 'ptx'] = thr.value['PTX'][x].astype("int64")
+                
+                # Take the index of the project element with the same characteristics of the considered window
+                # EQTYPE-FREQBAND-BANDWIDTH
+                x = thr.value.index[(thr.value['EQTYPE'] == wind.iloc[0]['eqtype'])
+                            & (thr.value['FREQBAND'] == wind.iloc[0]['freqband'])
+                              & (thr.value['BANDWITDH'] == wind.iloc[0]['bandwidth'])]
+
+                # Take all the project data indicated by the indexes
+                w = thr.value.iloc[x]
+                print(w)
+                # Select and assign the min Rx power Threshold correlated to the lowest configurable modulation
+
+                wind.at[0, 'Thr_min'] = int(w.loc[w['LOWERMOD'] == min(w['LOWERMOD'])]['PTH'])
+                
+                df_window = df_window.append(wind)
 
     return df_window
 
