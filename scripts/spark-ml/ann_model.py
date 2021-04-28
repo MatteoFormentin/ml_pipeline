@@ -1,16 +1,15 @@
-from os import truncate
-from numpy.core.numeric import False_
 from pyspark.sql import *
 from pyspark.sql.types import *
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType
+from pyspark.sql.functions import col
 import pandas as pd
 import numpy as np
-# from sklearn.externals import joblib
+import joblib
 
 ES_HOST = "http://localhost"
 INDEX_NAME = "siae-pm"
-MODEL_PATH = "ann_model.joblib"
+MODEL_PATH = "scripts/spark-ml/ann_model.joblib"
 
 # Init Spark session - add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
 spark = SparkSession.builder.config(
@@ -26,7 +25,24 @@ thr = spark.sparkContext.broadcast(pd.read_csv(
     "scripts/spark-ml/Project_good_modulation.csv", low_memory=False))
 
 # Broadcast the ML model
-ann_model = spark.broadcast(joblib.load(MODEL_PATH))
+ann_model = spark.sparkContext.broadcast(joblib.load(MODEL_PATH))
+
+# Value for scaling input values
+mean = spark.sparkContext.broadcast(np.array([0.70447761,  38.56467662,   7.73880597,  25.00945274,  24.39900498,
+                                              -66.55522388, -71.47363184,  20.40149254,  20.21641791, -60.65572139,
+                                              -64.79004975,  43.63383085,   9.00995025,  25.37661692,  24.69402985,
+                                              -67.51094527, -73.96119403,  20.81094527,  20.72835821, -61.87363184,
+                                              - 67.11293532,  55.81393035,  11.18656716,  25.54129353,  24.34278607,
+                                              - 67.58557214, -78.19154229,  20.6681592,   20.34577114, -61.85522388,
+                                              -71.10298507, -75.57711443,  20.86467662, -42.36666667, -84.43283582]))
+
+std = spark.sparkContext.broadcast(np.array([0.45627723, 123.57359298,  35.18979014,  24.79695476,  26.46595483,
+                                             30.5354078,   30.02765808,  13.74593555,  14.91493055,  24.25004241,
+                                             24.26291933, 126.16662855,  38.79644417,  25.28163651,  27.27465636,
+                                             30.51920739,  29.67238169,  14.35554497,  16.86584,     24.65059214,
+                                             24.57174857, 135.94802272,  41.07536477,  24.95222373,  28.68671768,
+                                             30.16953573,  28.84897419,  13.40055806,  19.03718133,  23.87716149,
+                                             24.45482872,   7.01377633,   2.73917517,   9.16365215,   2.10866877]))
 
 
 #  Windowed dataframe schema
@@ -78,18 +94,18 @@ schema = StructType([
 ])
 
 # This must correspond with the above schema for success conversion from pd to spark
-columns = np.array(['idlink', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
-                    'freqband', 'bandwidth', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
-                    'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
-                    'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
-                    'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN',
-                    'lowthr', 'ptx', 'RxNominal', 'Thr_min'
-                    ])
 
 
 # Input-> a dataframe that contains a group (one link), out-> windowed df
 @F.pandas_udf(schema, functionType=F.PandasUDFType.GROUPED_MAP)
 def make_window(df_grouped):
+    columns = np.array(['idlink', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
+                        'freqband', 'bandwidth', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
+                        'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
+                        'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
+                        'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN',
+                        'lowthr', 'ptx', 'RxNominal', 'Thr_min'
+                        ])
 
     # Cast data column to datetime else cause problem with pyarrow
     df_grouped['data'] = pd.to_datetime(df_grouped['data'], dayfirst=True)
@@ -270,35 +286,71 @@ def make_window(df_grouped):
     return df_window
 
 
-# Order by id asc, ramo asc, data asc
-preprocessed_df = df.where(df.idlnk == 287).orderBy(df.idlink.asc(), df.ramo.asc(), df.data.asc()) \
-    .groupBy(df.idlink) \
-    .apply(make_window)
-
-preprocessed_df.write.format('csv').option('header', True).mode(
-    'overwrite').option('sep', ',').save('preprocessed_dataset.csv')
-
-preprocessed_df.show(truncate=False)
-
-
-# TODO: Check predictions with idlink 287
-
-'''
-# Load classifier and broadcast to executors.
-
 # Define Pandas UDF
 @F.pandas_udf(returnType=DoubleType(), functionType=F.PandasUDFType.SCALAR)
 def predict(*cols):
     # Columns are passed as a tuple of Pandas Series'.
     # Combine into a Pandas DataFrame
-    X = pd.concat(cols, axis=1)
+    windows = pd.concat(cols, axis=1)
+    windows.columns = np.array(['acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
+                                'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
+                                'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
+                                'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN',
+                                'lowthr', 'ptx', 'RxNominal', 'Thr_min'
+                                ])
+    '''for col in windows.columns:
+        print(col)'''
 
-    # Make predictions and select probabilities of positive class (1).
-    predictions = clf.value.predict_proba(X)[:, 1]
+    tx = ['txMaxAN-2', 'txminAN-2', 'txMaxBN-2', 'txminBN-2', 'txMaxAN-1', 'txminAN-1',
+          'txMaxBN-1', 'txminBN-1', 'txMaxAN', 'txminAN', 'txMaxBN', 'txminBN']
+    # Fill the Nan value in the Tx power features with 100
+    windows[tx] = windows[tx].fillna(100)
+    # Fill the Nan value in the Rx power features with -150.
+    # After we filled tx values, we know from the database that the only NAN values will be the rx ones
+    windows = windows.fillna(-150)
+    windows = (windows.to_numpy() - mean.value) / std.value
+
+    pred = ann_model.value.predict(windows)
+
+    # Take the index where is present the value 1, that identify the predicted label
+    pred = np.argmax(pred, axis=1)
 
     # Return Pandas Series of predictions.
-    return pd.Series(predictions)
+    return pd.Series(pred)
 
-# Make predictions on Spark DataFrame.
-df = df.withColumn("predictions", predict(*feature_cols))
-'''
+
+print("------------------------------------------------------------")
+print("--------------------- PREPROCESSING ------------------------")
+print("------------------------------------------------------------")
+
+# Order by id asc, ramo asc, data asc
+preprocessed_df = df.orderBy(df.idlink.asc(), df.ramo.asc(), df.data.asc()) \
+    .groupBy(df.idlink) \
+    .apply(make_window)
+
+preprocessed_df.show(truncate=False)
+
+
+print("------------------------------------------------------------")
+print("----------------------- PREDICTION -------------------------")
+print("------------------------------------------------------------")
+
+predicted_df = preprocessed_df.withColumn("predictions", predict(col('acmEngine'), col(
+    'esN-2'), col('sesN-2'), col('txMaxAN-2'), col('txminAN-2'), col('rxmaxAN-2'), col('rxminAN-2'),
+    col('txMaxBN-2'), col('txminBN-2'), col('rxmaxBN-2'), col('rxminBN-2'), col(
+    'esN-1'), col('sesN-1'), col('txMaxAN-1'), col('txminAN-1'),
+    col('rxmaxAN-1'), col('rxminAN-1'), col('txMaxBN-1'), col('txminBN-1'), col(
+        'rxmaxBN-1'), col('rxminBN-1'), col('esN'), col('sesN'),
+    col('txMaxAN'), col('txminAN'), col('rxmaxAN'), col('rxminAN'), col(
+    'txMaxBN'), col('txminBN'), col('rxmaxBN'), col('rxminBN'),
+    col('lowthr'), col('ptx'), col('RxNominal'), col('Thr_min')))
+
+
+predicted_df.write.format('csv').option('header', True).mode(
+    'overwrite').option('sep', ',').save('predicted_dataset.csv')
+predicted_df.show()
+'''preprocessed_df.write.format('csv').option('header', True).mode(
+    'overwrite').option('sep', ',').save('preprocessed_dataset.csv')'''
+
+
+# TODO: Check predictions with idlink 287

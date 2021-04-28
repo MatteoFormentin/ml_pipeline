@@ -134,6 +134,8 @@ columns = windows.columns.values
 # The variable is used to address and drop some features not useful in the training and cross-validation phase
 # Delete the columns that are not useful
 windows = windows.drop(columns=columns[:8])
+for col in windows.columns:
+    print(col)
 # Delete the 'label' columns because we can't train a model using it as an input data
 windows = windows.drop(columns=['label'])
 # After the elimination of the useless columns our data are described by 35 features
@@ -248,8 +250,12 @@ Best_neurons = 50
 Best_activation = "logistic"
 
 # Scale the data (Manually)
-# mean_train = np.mean(X_train, axis=0)  # Mean per feature of the training data
-# std_train = np.std(X_train, axis=0)  # Std per feature of the training data
+mean_train = np.mean(X_train, axis=0)  # Mean per feature of the training data
+print("MEAN:")
+print(mean_train)
+std_train = np.std(X_train, axis=0)  # Std per feature of the training data
+print("STD:")
+print(std_train)
 # X_train = (X_train-mean_train) / std_train  # Scaling training data
 # X_test = (X_test-mean_train) / std_train  # Scaling validation data
 
