@@ -2,7 +2,7 @@ from pyspark.sql import *
 from pyspark.sql.types import *
 from pyspark.sql import functions as F
 from pyspark.sql.types import DoubleType
-from pyspark.sql.functions import col
+from pyspark.sql.functions import col, lit, element_at
 import pandas as pd
 import numpy as np
 import joblib
@@ -12,7 +12,7 @@ import joblib
 # ------------------
 
 ES_HOST = "http://localhost"
-INDEX_NAME = "siae-pm"
+SRC_NAME = "siae-pm"
 MODEL_PATH = "scripts/spark-ml/ann_model.joblib"
 DEST_INDEX = "predictions-pm"
 
@@ -334,21 +334,29 @@ def predict(*cols):
 #   SPARK PIPELINE
 # ------------------
 
-# In production delete all show() else it will not work as a pipeline
+# NB: In production delete all show() else it will not work as a pipeline
+es_query = """{
+  "query": {
+    "match": {
+      "spark_processed": {
+        "query": "false"
+      }
+    }
+  }
+}"""
 
-# Read the full dataset from Elasticsearch
-reader = spark.read.format("org.elasticsearch.spark.sql").option("es.read.metadata", "true").option(
+# Read the full dataset from Elasticsearch - Also add id column retrived from metadata (dropped) in order to update es spark_processed col
+reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
     "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
-df = reader.load(INDEX_NAME)  # .where(col("idlink") == 1115)
-
+df = reader.load(SRC_NAME).withColumn(
+    "id", element_at(col("_metadata"), "_id")).drop(col("_metadata"))  # .where(col("idlink") == 1115)
 
 # Apply preprocess function
 preprocessed_df = df.orderBy(df.idlink.asc(), df.ramo.asc(), df.data.asc()) \
     .groupBy(df.idlink) \
     .apply(make_window)
 
-
-# Predict
+# Predict -> add a new column to preprocessed_df that contains the class
 predicted_df = preprocessed_df.withColumn("predictions", predict(col('acmEngine'), col(
     'esN-2'), col('sesN-2'), col('txMaxAN-2'), col('txminAN-2'), col('rxmaxAN-2'), col('rxminAN-2'),
     col('txMaxBN-2'), col('txminBN-2'), col('rxmaxBN-2'), col('rxminBN-2'), col(
@@ -363,10 +371,15 @@ predicted_df = preprocessed_df.withColumn("predictions", predict(col('acmEngine'
 predicted_df = predicted_df.withColumn(
     "@timestamp", F.date_format(col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
 
-'''predicted_df.write.format('csv').option('header', True).mode(
-    'overwrite').option('sep', ',').save('predicted_dataset.csv')'''
-
-
 # Save predictions to Elasticsearch
 predicted_df.select(col("@timestamp"), col("idlink"), col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
     "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()
+
+# Set spark_processed column to true on elasticsearch original table - it run an update script that only change spark_processed to true
+df.withColumn("spark_processed", lit("true")).write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert").option("es.mapping.id", "id").option(
+    "es.update.script.inline", "ctx._source.spark_processed = true").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
+    "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
+
+
+'''predicted_df.write.format('csv').option('header', True).mode(
+    'overwrite').option('sep', ',').save('predicted_dataset.csv')'''
