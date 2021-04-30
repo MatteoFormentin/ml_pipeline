@@ -7,19 +7,25 @@ import pandas as pd
 import numpy as np
 import joblib
 
+# ------------------
+#        PARAMS
+# ------------------
+
 ES_HOST = "http://localhost"
 INDEX_NAME = "siae-pm"
 MODEL_PATH = "scripts/spark-ml/ann_model.joblib"
+DEST_INDEX = "predictions-pm"
+
+
+# ------------------
+#     SPARK INIT
+# ------------------
 
 # Init Spark session - add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
 spark = SparkSession.builder.config(
     'spark.driver.extraClassPath', 'scripts/elasticsearch-spark-20_2.12-7.12.0.jar').appName("ANN-Model-1.0").getOrCreate()
 
-# Read the full dataset from Elasticsearch
-reader = spark.read.format("org.elasticsearch.spark.sql").option("es.read.metadata", "true").option(
-    "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", "http://localhost")
-df = reader.load(INDEX_NAME)
-
+# Data or var that should be shared by workers must be broadcasted
 # Broadcast the dataframe that contains 3 new feautures
 thr = spark.sparkContext.broadcast(pd.read_csv(
     "scripts/spark-ml/Project_good_modulation.csv", low_memory=False))
@@ -27,7 +33,7 @@ thr = spark.sparkContext.broadcast(pd.read_csv(
 # Broadcast the ML model
 ann_model = spark.sparkContext.broadcast(joblib.load(MODEL_PATH))
 
-# Value for scaling input values
+# Value for scaling input values - mean and std of training dataset
 mean = spark.sparkContext.broadcast(np.array([0.70447761,  38.56467662,   7.73880597,  25.00945274,  24.39900498,
                                               -66.55522388, -71.47363184,  20.40149254,  20.21641791, -60.65572139,
                                               -64.79004975,  43.63383085,   9.00995025,  25.37661692,  24.69402985,
@@ -45,12 +51,12 @@ std = spark.sparkContext.broadcast(np.array([0.45627723, 123.57359298,  35.18979
                                              24.45482872,   7.01377633,   2.73917517,   9.16365215,   2.10866877]))
 
 
-#  Windowed dataframe schema
+# Pre-processed dataframe schema
 schema = StructType([
     StructField("idlink", LongType(), True),
-    StructField("dataN-2", TimestampType(), True),
-    StructField("dataN-1", TimestampType(), True),
-    StructField("dataN", TimestampType(), True),
+    StructField("dataN-2", StringType(), True),
+    StructField("dataN-1", StringType(), True),
+    StructField("dataN", StringType(), True),
     StructField("eqtype", LongType(), True),
     StructField("acmLowerMode", LongType(), True),
     StructField("freqband", StringType(), True),
@@ -93,12 +99,15 @@ schema = StructType([
     # StructField("_metadata", MapType(StringType(), StringType(), True), True)
 ])
 
-# This must correspond with the above schema for success conversion from pd to spark
 
+# ------------------
+#         UDF
+# ------------------
 
 # Input-> a dataframe that contains a group (one link), out-> windowed df
 @F.pandas_udf(schema, functionType=F.PandasUDFType.GROUPED_MAP)
 def make_window(df_grouped):
+    # This must correspond with spark df schema above schema for success conversion from pd to spark
     columns = np.array(['idlink', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
                         'freqband', 'bandwidth', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
                         'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
@@ -108,7 +117,7 @@ def make_window(df_grouped):
                         ])
 
     # Cast data column to datetime else cause problem with pyarrow
-    df_grouped['data'] = pd.to_datetime(df_grouped['data'], dayfirst=True)
+    #df_grouped['data'] = pd.to_datetime(df_grouped['data'], dayfirst=True)
     chunksize = 3  # window dim
     # Create a Dataframe for 45-minutes window
     df_window = pd.DataFrame(data=None, columns=columns)
@@ -191,7 +200,7 @@ def make_window(df_grouped):
                 wind.at[0, 'freqband'] = "18"
             elif wind.iloc[0]['freqband'] == "17":
                 wind.at[0, 'freqband'] = "18"
-            elif (wind.iloc[0]['freqband'] == "10") and (wind.iloc[i]['eqtype'] == 29 or wind.iloc[i]['eqtype'] == 27):
+            elif (wind.iloc[0]['freqband'] == "10") and (wind.iloc[0]['eqtype'] == 29 or wind.iloc[0]['eqtype'] == 27):
                 wind.at[0, 'freqband'] = "11"
             elif wind.iloc[0]['freqband'] == "12":
                 wind.at[0, 'freqband'] = "13"
@@ -252,7 +261,7 @@ def make_window(df_grouped):
                 wind.at[0, 'acmLowerMode'] = 13
 
             # ------------------------------------------------------------
-            # 4 - ADD 3 NEW FEAUTURE - Based onadd_the_3_new_features.py
+            # 4 - ADD 3 NEW FEAUTURE - Based on add_the_3_new_features.py
             # NB: Performed directly on current created window
             # ------------------------------------------------------------
 
@@ -283,35 +292,37 @@ def make_window(df_grouped):
                 # Append the window to the df
                 df_window = df_window.append(wind)
 
-    return df_window
-
-
-# Define Pandas UDF
-@F.pandas_udf(returnType=DoubleType(), functionType=F.PandasUDFType.SCALAR)
-def predict(*cols):
-    # Columns are passed as a tuple of Pandas Series'.
-    # Combine into a Pandas DataFrame
-    windows = pd.concat(cols, axis=1)
-    windows.columns = np.array(['acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
-                                'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
-                                'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
-                                'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN',
-                                'lowthr', 'ptx', 'RxNominal', 'Thr_min'
-                                ])
-    '''for col in windows.columns:
-        print(col)'''
-
+    # ------------------------------------------------------------
+    # 5 - FILL MISSING VALUE - Based on ANN_model.py
+    # NB: Performed  on full df
+    # ------------------------------------------------------------
     tx = ['txMaxAN-2', 'txminAN-2', 'txMaxBN-2', 'txminBN-2', 'txMaxAN-1', 'txminAN-1',
           'txMaxBN-1', 'txminBN-1', 'txMaxAN', 'txminAN', 'txMaxBN', 'txminBN']
     # Fill the Nan value in the Tx power features with 100
-    windows[tx] = windows[tx].fillna(100)
+    df_window[tx] = df_window[tx].fillna(100)
     # Fill the Nan value in the Rx power features with -150.
     # After we filled tx values, we know from the database that the only NAN values will be the rx ones
-    windows = windows.fillna(-150)
+    df_window = df_window.fillna(-150)
+
+    return df_window
+
+
+# Input-> list of columns as list of pd.Series, out-> one column as pd.Series
+@F.pandas_udf(returnType=DoubleType(), functionType=F.PandasUDFType.SCALAR)
+def predict(*cols):
+    windows = pd.concat(cols, axis=1)
+
+    # ------------------------------------------------------------
+    # 6 - NORMALIZE VALUES - Based on ANN_model.py
+    # NB: Performed  on full df
+    # ------------------------------------------------------------
     windows = (windows.to_numpy() - mean.value) / std.value
 
+    # ------------------------------------------------------------
+    # 7 - PREDICT - Based on ANN_model.py
+    # NB: Performed  on full df
+    # ------------------------------------------------------------
     pred = ann_model.value.predict(windows)
-
     # Take the index where is present the value 1, that identify the predicted label
     pred = np.argmax(pred, axis=1)
 
@@ -319,22 +330,25 @@ def predict(*cols):
     return pd.Series(pred)
 
 
-print("------------------------------------------------------------")
-print("--------------------- PREPROCESSING ------------------------")
-print("------------------------------------------------------------")
+# ------------------
+#   SPARK PIPELINE
+# ------------------
 
-# Order by id asc, ramo asc, data asc
+# In production delete all show() else it will not work as a pipeline
+
+# Read the full dataset from Elasticsearch
+reader = spark.read.format("org.elasticsearch.spark.sql").option("es.read.metadata", "true").option(
+    "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
+df = reader.load(INDEX_NAME)    #.where(col("idlink") == 1115)
+
+
+# Apply preprocess function
 preprocessed_df = df.orderBy(df.idlink.asc(), df.ramo.asc(), df.data.asc()) \
     .groupBy(df.idlink) \
     .apply(make_window)
 
-preprocessed_df.show(truncate=False)
 
-
-print("------------------------------------------------------------")
-print("----------------------- PREDICTION -------------------------")
-print("------------------------------------------------------------")
-
+# Predict
 predicted_df = preprocessed_df.withColumn("predictions", predict(col('acmEngine'), col(
     'esN-2'), col('sesN-2'), col('txMaxAN-2'), col('txminAN-2'), col('rxmaxAN-2'), col('rxminAN-2'),
     col('txMaxBN-2'), col('txminBN-2'), col('rxmaxBN-2'), col('rxminBN-2'), col(
@@ -345,12 +359,13 @@ predicted_df = preprocessed_df.withColumn("predictions", predict(col('acmEngine'
     'txMaxBN'), col('txminBN'), col('rxmaxBN'), col('rxminBN'),
     col('lowthr'), col('ptx'), col('RxNominal'), col('Thr_min')))
 
+predicted_df = predicted_df.withColumn(
+    "dataN", F.date_format(col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
 
-predicted_df.write.format('csv').option('header', True).mode(
-    'overwrite').option('sep', ',').save('predicted_dataset.csv')
-predicted_df.show()
-'''preprocessed_df.write.format('csv').option('header', True).mode(
-    'overwrite').option('sep', ',').save('preprocessed_dataset.csv')'''
+'''predicted_df.write.format('csv').option('header', True).mode(
+    'overwrite').option('sep', ',').save('predicted_dataset.csv')'''
 
 
-# TODO: Check predictions with idlink 287
+# Save predictions to Elasticsearch
+predicted_df.select(col("idlink"), col("dataN").alias("data"), col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
+    "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()

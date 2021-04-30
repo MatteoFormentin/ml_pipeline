@@ -116,7 +116,7 @@ class Controller():
             "--interval", "-i", type=float, default=15*60, help="Set time interval between each log publish in seconds. Default 15 minutes")
 
         sim_parser.add_argument(
-            "--limit", "-l", type=int, default=15*60, help="Set how many producer run. Additional CSV log will be ignored.")
+            "--limit", "-l", type=int, default=100, help="Set how many producer run. Additional CSV log will be ignored.")
 
         # Parser for split command
         split_parser = function_choose_parser.add_parser(
