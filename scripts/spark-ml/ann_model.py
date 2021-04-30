@@ -54,9 +54,9 @@ std = spark.sparkContext.broadcast(np.array([0.45627723, 123.57359298,  35.18979
 # Pre-processed dataframe schema
 schema = StructType([
     StructField("idlink", LongType(), True),
-    StructField("dataN-2", StringType(), True),
-    StructField("dataN-1", StringType(), True),
-    StructField("dataN", StringType(), True),
+    StructField("dataN-2", TimestampType(), True),
+    StructField("dataN-1", TimestampType(), True),
+    StructField("dataN", TimestampType(), True),
     StructField("eqtype", LongType(), True),
     StructField("acmLowerMode", LongType(), True),
     StructField("freqband", StringType(), True),
@@ -339,7 +339,7 @@ def predict(*cols):
 # Read the full dataset from Elasticsearch
 reader = spark.read.format("org.elasticsearch.spark.sql").option("es.read.metadata", "true").option(
     "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
-df = reader.load(INDEX_NAME)    #.where(col("idlink") == 1115)
+df = reader.load(INDEX_NAME)  # .where(col("idlink") == 1115)
 
 
 # Apply preprocess function
@@ -359,13 +359,14 @@ predicted_df = preprocessed_df.withColumn("predictions", predict(col('acmEngine'
     'txMaxBN'), col('txminBN'), col('rxmaxBN'), col('rxminBN'),
     col('lowthr'), col('ptx'), col('RxNominal'), col('Thr_min')))
 
+# Create a @timestamp column to use as time index in elasticsearch
 predicted_df = predicted_df.withColumn(
-    "dataN", F.date_format(col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
+    "@timestamp", F.date_format(col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
 
 '''predicted_df.write.format('csv').option('header', True).mode(
     'overwrite').option('sep', ',').save('predicted_dataset.csv')'''
 
 
 # Save predictions to Elasticsearch
-predicted_df.select(col("idlink"), col("dataN").alias("data"), col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
+predicted_df.select(col("@timestamp"), col("idlink"), col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
     "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()
