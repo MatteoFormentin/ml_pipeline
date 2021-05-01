@@ -355,6 +355,11 @@ reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_
 df = reader.load(SRC_NAME).withColumn("id", F.element_at(F.col(
     "_metadata"), "_id")).orderBy(F.col("data").asc())  # .where(F.col("idlink") == 1115)
 
+# Filter groups that have less than 3 logs inside
+w = Window.partitionBy("idlink", "ramo")
+df = df.withColumn("group_count", F.count(F.col("idlink")).over(w)) \
+    .where(F.col("group_count") >= 3)
+
 # Apply preprocess function
 preprocessed_df = df.groupBy(F.col("idlink"), F.col("ramo")).apply(make_window)
 
@@ -377,14 +382,17 @@ predicted_df = predicted_df.withColumn(
 predicted_df.select(F.col("@timestamp"), F.col("idlink"), F.col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
     "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()
 
-# Set spark_processed column to true on elasticsearch original table - let last logs of each idlink, ramo group unprocessed in order to make next window complete
-w = Window.partitionBy("idlink", "ramo")
-processed_flag_df = df.withColumn("latest_timestamp", F.max("data").over(w))\
-    .withColumn("spark_processed", F.when(F.col("data") == F.col("latest_timestamp"), "false").otherwise("true")).drop("latest_timestamp", '_metadata')
+# Set spark_processed column to true on elasticsearch original table - let lasta and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
+# Use another window function
+w1 = Window.partitionBy("idlink", "ramo").orderBy("data")
+processed_flag_df = df.withColumn("row_number", F.row_number().over(w1)) \
+    .withColumn("spark_processed", F.when(F.col("group_count") == F.col("row_number"), "false").when(F.col("group_count") - 1 == F.col("row_number"), "false").otherwise("true"))\
+    .drop("_metadata", "row_number", "group_count")
 processed_flag_df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
     .option("es.mapping.id", "id").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
     "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
 
 
-'''df.drop(F.col("_metadata")).write.format('csv').option('header', True).mode(
-    'overwrite').option('sep', ',').save('df.csv')'''
+'''processed_flag_df.write.format('csv').option('header', True).mode(
+    'overwrite').option('sep', ',').save('df.csv')
+'''
