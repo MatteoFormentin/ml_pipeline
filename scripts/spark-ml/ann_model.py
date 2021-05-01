@@ -334,65 +334,75 @@ def predict(*cols):
 # ------------------
 #   SPARK PIPELINE
 # ------------------
-
-# NB: In production delete all show() else it will not work as a pipeline
-es_query = """
-{
-  "query": {
-    "match": {
-      "spark_processed": {
-        "query": "false"
-      }
+while True:
+    # NB: In production delete all show() else it will not work as a pipeline
+    es_query = """
+    {
+        "query": {
+            "match": {
+                "spark_processed": {
+                    "query": "false"
+                }
+            }
+        }
     }
-  }
-}
-"""
+    """
 
-# Read the  dataset from Elasticsearch, query only documents where spark_processed == false
-# Also add id column retrived from metadata in order to update es spark_processed col
-reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
-    "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
-df = reader.load(SRC_NAME).withColumn("id", F.element_at(F.col(
-    "_metadata"), "_id")).orderBy(F.col("data").asc())  # .where(F.col("idlink") == 1115)
+    # 1 - READ the  dataset from Elasticsearch, query only documents where spark_processed == false
+    # Also add id column retrived from metadata in order to update es spark_processed col
+    reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
+        "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
+    df = reader.load(SRC_NAME).withColumn("id", F.element_at(F.col(
+        "_metadata"), "_id")).orderBy(F.col("data").asc())
 
-# Filter groups that have less than 3 logs inside
-w = Window.partitionBy("idlink", "ramo")
-df = df.withColumn("group_count", F.count(F.col("idlink")).over(w)) \
-    .where(F.col("group_count") >= 3)
+    print("LOADED")
+    df.show()
 
-# Apply preprocess function
-preprocessed_df = df.groupBy(F.col("idlink"), F.col("ramo")).apply(make_window)
+    # 2 - FILTER groups that have less than 3 logs inside
+    w = Window.partitionBy("idlink", "ramo")
+    df = df.withColumn("group_count", F.count(F.col("idlink")).over(w)) \
+        .where(F.col("group_count") >= 3)
 
-# Predict -> add a new column to preprocessed_df that contains the class
-predicted_df = preprocessed_df.withColumn("predictions", predict(F.col('acmEngine'), F.col(
-    'esN-2'), F.col('sesN-2'), F.col('txMaxAN-2'), F.col('txminAN-2'), F.col('rxmaxAN-2'), F.col('rxminAN-2'),
-    F.col('txMaxBN-2'), F.col('txminBN-2'), F.col('rxmaxBN-2'), F.col('rxminBN-2'), F.col(
-    'esN-1'), F.col('sesN-1'), F.col('txMaxAN-1'), F.col('txminAN-1'),
-    F.col('rxmaxAN-1'), F.col('rxminAN-1'), F.col('txMaxBN-1'), F.col('txminBN-1'), F.col(
-        'rxmaxBN-1'), F.col('rxminBN-1'), F.col('esN'), F.col('sesN'),
-    F.col('txMaxAN'), F.col('txminAN'), F.col('rxmaxAN'), F.col('rxminAN'), F.col(
-    'txMaxBN'), F.col('txminBN'), F.col('rxmaxBN'), F.col('rxminBN'),
-    F.col('lowthr'), F.col('ptx'), F.col('RxNominal'), F.col('Thr_min')))
+    # 3 - FLAG spark_processed column to true on elasticsearch original table - let lasta and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
+    # Use another window function
+    w1 = Window.partitionBy("idlink", "ramo").orderBy("data")
+    df = df.withColumn("row_number", F.row_number().over(w1)) \
+        .withColumn("spark_processed", F.when(F.col("group_count") == F.col("row_number"), "false").when(F.col("group_count") - 1 == F.col("row_number"), "false").otherwise("true"))\
+        .drop("_metadata", "row_number").cache()
 
-# Create a @timestamp column to use as time index in elasticsearch
-predicted_df = predicted_df.withColumn(
-    "@timestamp", F.date_format(F.col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
+    # 4a - PREPROCESS Apply preprocess function
+    preprocessed_df = df.groupBy(
+        F.col("idlink"), F.col("ramo")).apply(make_window)
 
-# Save predictions to Elasticsearch
-predicted_df.select(F.col("@timestamp"), F.col("idlink"), F.col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
-    "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()
+    # 5a - PREDICT -> add a new column to preprocessed_df that contains the class
+    predicted_df = preprocessed_df.withColumn("predictions", predict(F.col('acmEngine'), F.col(
+        'esN-2'), F.col('sesN-2'), F.col('txMaxAN-2'), F.col('txminAN-2'), F.col('rxmaxAN-2'), F.col('rxminAN-2'),
+        F.col('txMaxBN-2'), F.col('txminBN-2'), F.col('rxmaxBN-2'), F.col('rxminBN-2'), F.col(
+        'esN-1'), F.col('sesN-1'), F.col('txMaxAN-1'), F.col('txminAN-1'),
+        F.col('rxmaxAN-1'), F.col('rxminAN-1'), F.col('txMaxBN-1'), F.col('txminBN-1'), F.col(
+            'rxmaxBN-1'), F.col('rxminBN-1'), F.col('esN'), F.col('sesN'),
+        F.col('txMaxAN'), F.col('txminAN'), F.col('rxmaxAN'), F.col('rxminAN'), F.col(
+        'txMaxBN'), F.col('txminBN'), F.col('rxmaxBN'), F.col('rxminBN'),
+        F.col('lowthr'), F.col('ptx'), F.col('RxNominal'), F.col('Thr_min')))
 
-# Set spark_processed column to true on elasticsearch original table - let lasta and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
-# Use another window function
-w1 = Window.partitionBy("idlink", "ramo").orderBy("data")
-processed_flag_df = df.withColumn("row_number", F.row_number().over(w1)) \
-    .withColumn("spark_processed", F.when(F.col("group_count") == F.col("row_number"), "false").when(F.col("group_count") - 1 == F.col("row_number"), "false").otherwise("true"))\
-    .drop("_metadata", "row_number", "group_count")
-processed_flag_df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
-    .option("es.mapping.id", "id").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
-    "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
+    # 6a - TIMESTAMP PREDICTION Create a @timestamp column to use as time index in elasticsearch
+    predicted_df = predicted_df.withColumn(
+        "@timestamp", F.date_format(F.col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
 
+    # 7a - ES PREDICTION Save predictions to Elasticsearch
+    predicted_df.select(F.col("@timestamp"), F.col("idlink"), F.col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
+        "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()
 
-'''processed_flag_df.write.format('csv').option('header', True).mode(
-    'overwrite').option('sep', ',').save('df.csv')
-'''
+    print("FLAG ES")
+    df.show()
+
+    # 4b - ES FLAG
+    df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
+        .option("es.mapping.id", "id").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
+        "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
+
+    df.unpersist()
+
+    '''processed_flag_df.write.format('csv').option('header', True).mode(
+        'overwrite').option('sep', ',').save('df.csv')
+    '''
