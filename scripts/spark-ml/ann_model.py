@@ -15,7 +15,7 @@ import joblib
 ES_HOST = "http://localhost"
 SRC_NAME = "siae-pm"
 MODEL_PATH = "scripts/spark-ml/ann_model.joblib"
-DEST_INDEX = "predictions-pm"
+DEST_INDEX = "prediction-pm"
 
 
 # ------------------
@@ -24,7 +24,7 @@ DEST_INDEX = "predictions-pm"
 
 # Init Spark session - add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
 spark = SparkSession.builder.config(
-    'spark.driver.extraClassPath', 'scripts/elasticsearch-spark-20_2.12-7.12.0.jar').appName("ANN-Model-1.0").getOrCreate()
+    'spark.driver.extraClassPath', 'scripts/elasticsearch-spark-20_2.12-7.12.0.jar').config('spark.sql.session.timeZone', 'UTC').appName("ANN-Model-1.0").getOrCreate()
 
 # Data or var that should be shared by workers must be broadcasted
 # Broadcast the dataframe that contains 3 new feautures
@@ -54,6 +54,7 @@ std = spark.sparkContext.broadcast(np.array([0.45627723, 123.57359298,  35.18979
 
 # Pre-processed dataframe schema
 schema = StructType([
+    StructField("id", StringType(), True),
     StructField("idlink", LongType(), True),
     StructField("dataN-2", TimestampType(), True),
     StructField("dataN-1", TimestampType(), True),
@@ -109,7 +110,7 @@ schema = StructType([
 @F.pandas_udf(schema, functionType=F.PandasUDFType.GROUPED_MAP)
 def make_window(df_grouped):
     # This must correspond with spark df schema above schema for success conversion from pd to spark
-    columns = np.array(['idlink', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
+    columns = np.array(['id', 'idlink', 'dataN-2', 'dataN-1', 'dataN', 'eqtype', 'acmLowerMode',
                         'freqband', 'bandwidth', 'acmEngine', 'esN-2', 'sesN-2', 'txMaxAN-2', 'txminAN-2', 'rxmaxAN-2', 'rxminAN-2',
                         'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
                         'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
@@ -137,6 +138,8 @@ def make_window(df_grouped):
                 and (chunk.iloc[1]['ramo'] == chunk.iloc[2]['ramo']):
             # This wll also reorder the dataframe
             data = [[
+                # We are predicting the last row of window (index = 2) - set that id in order to update the right document on es
+                chunk.iloc[2]['id'],
                 chunk.iloc[0]['idlink'],
                 chunk.iloc[0]['data'],
                 chunk.iloc[1]['data'],
@@ -327,7 +330,7 @@ def predict(*cols):
     # Take the index where is present the value 1, that identify the predicted label
     pred = np.argmax(pred, axis=1)
 
-    # Return Pandas Series of predictions.
+    # Return Pandas Series of prediction.
     return pd.Series(pred)
 
 
@@ -348,34 +351,36 @@ while True:
     }
     """
 
+    # NOTES ON ES UPSERT MODE
+    # Es automatically merge the predicted df with the index using row/document id: just provide only the column that needs to be update and, in that column, null (empty) value when no update needed
+
     # 1 - READ the  dataset from Elasticsearch, query only documents where spark_processed == false
     # Also add id column retrived from metadata in order to update es spark_processed col
     reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
         "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
     df = reader.load(SRC_NAME).withColumn("id", F.element_at(F.col(
-        "_metadata"), "_id")).orderBy(F.col("data").asc())
-
-    print("LOADED")
-    df.show()
+        "_metadata"), "_id")).orderBy(F.col("data").asc()).drop("prediction")  # drop prediction: when old prediction must be kept null is provided in the new prediction col
 
     # 2 - FILTER groups that have less than 3 logs inside
+    # Add a new column group_count that contains the number of rows for each group idlink, ramo
     w = Window.partitionBy("idlink", "ramo")
     df = df.withColumn("group_count", F.count(F.col("idlink")).over(w)) \
         .where(F.col("group_count") >= 3)
 
-    # 3 - FLAG spark_processed column to true on elasticsearch original table - let lasta and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
-    # Use another window function
+    # 3 - FLAG spark_processed column to true on elasticsearch original table - let last and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
+    # Use another window function to add row number (index 1 to group_count) to each group than to group_count and group_count - 1 index set spark_processed to false
+    # IMPORTANT: Cache else on updating also non-predicted rows are considered 
     w1 = Window.partitionBy("idlink", "ramo").orderBy("data")
     df = df.withColumn("row_number", F.row_number().over(w1)) \
         .withColumn("spark_processed", F.when(F.col("group_count") == F.col("row_number"), "false").when(F.col("group_count") - 1 == F.col("row_number"), "false").otherwise("true"))\
         .drop("_metadata", "row_number").cache()
 
-    # 4a - PREPROCESS Apply preprocess function
+    # 4 - PREPROCESS Apply preprocess function
     preprocessed_df = df.groupBy(
         F.col("idlink"), F.col("ramo")).apply(make_window)
 
-    # 5a - PREDICT -> add a new column to preprocessed_df that contains the class
-    predicted_df = preprocessed_df.withColumn("predictions", predict(F.col('acmEngine'), F.col(
+    # 5 - PREDICT -> add a new column to preprocessed_df that contains the class
+    predicted_df = preprocessed_df.withColumn("prediction", predict(F.col('acmEngine'), F.col(
         'esN-2'), F.col('sesN-2'), F.col('txMaxAN-2'), F.col('txminAN-2'), F.col('rxmaxAN-2'), F.col('rxminAN-2'),
         F.col('txMaxBN-2'), F.col('txminBN-2'), F.col('rxmaxBN-2'), F.col('rxminBN-2'), F.col(
         'esN-1'), F.col('sesN-1'), F.col('txMaxAN-1'), F.col('txminAN-1'),
@@ -385,23 +390,26 @@ while True:
         'txMaxBN'), F.col('txminBN'), F.col('rxmaxBN'), F.col('rxminBN'),
         F.col('lowthr'), F.col('ptx'), F.col('RxNominal'), F.col('Thr_min')))
 
-    # 6a - TIMESTAMP PREDICTION Create a @timestamp column to use as time index in elasticsearch
-    predicted_df = predicted_df.withColumn(
-        "@timestamp", F.date_format(F.col("dataN"), "yyyy-MM-dd'T'HH:mm:ss.SSSZ"))
+    # 6 - JOIN Put prediction column values in correct rows on original dataset
+    # Rename id col to id_2 - to avoid duplicate after join
+    predicted_df = predicted_df.withColumnRenamed("id", "id_2").select(F.col("id_2"), F.col(
+        "prediction"))
+    # Left Join on row id - when no match on prediction is found null (empty) is added to the joined table prediction column - this avoid Es to perform update on that docƒ
+    to_write_df = df.join(predicted_df, df.id == predicted_df.id_2, how='left')
+    # Add predicted class label - null (empty) when no prediction has been made
+    to_write_df = to_write_df.withColumn("prediction_label", F.when(F.col("prediction") == 0, "Deep Fading").when(F.col("prediction") == 1, "Extra Attenuation").when(F.col(
+        "prediction") == 2, "Interference").when(F.col("prediction") == 3, "Low Margin").when(F.col("prediction") == 4, "Self-Interference").when(F.col("prediction") == 5, "Hardware Failures"))
+    # Select only column that needs to be updated
+    to_write_df = to_write_df.select(F.col("id"), F.col("prediction"), F.col(
+        "prediction_label"), F.col("spark_processed"))
 
-    # 7a - ES PREDICTION Save predictions to Elasticsearch
-    predicted_df.select(F.col("@timestamp"), F.col("idlink"), F.col("predictions")).write.format('org.elasticsearch.spark.sql').mode("append").option(
-        "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", DEST_INDEX).save()
-
-    print("FLAG ES")
-    df.show()
-
-    # 4b - ES FLAG
-    df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
+    # 7 - SAVE PREDICTION TO ES prediction to Elasticsearch and update flag
+    to_write_df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
         .option("es.mapping.id", "id").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
         "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
 
-    df.unpersist()
+    #8 - CLEAR CACHE to prepare for next batch
+    spark.catalog.clearCache()
 
     '''processed_flag_df.write.format('csv').option('header', True).mode(
         'overwrite').option('sep', ',').save('df.csv')
