@@ -14,7 +14,7 @@ from joblib import dump, load
 pd.options.mode.chained_assignment = None
 np.set_printoptions(threshold=np.inf)
 
-os.chdir('ml')
+os.chdir('ml-models/ann')
 
 
 # ----------------------------------------------- CONFUSION MATRIX PLOT -----------------------------------------------
@@ -258,7 +258,7 @@ print("STD:")
 print(std_train)
 # X_train = (X_train-mean_train) / std_train  # Scaling training data
 # X_test = (X_test-mean_train) / std_train  # Scaling validation data
-
+print(X_train)
 # Scale the data
 X_train = scaler.fit_transform(X_train)  # Scale the train data as (value - mean) / std
 X_test = scaler.transform(X_test)  # scale the test data as (value - mean_train) / std_train

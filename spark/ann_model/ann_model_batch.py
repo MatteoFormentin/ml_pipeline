@@ -1,21 +1,26 @@
+# ---------------------------------------------------------
+# ann_model.py
+# Batch processing of Elasticsearch index with ANN model
+# ---------------------------------------------------------
+
+
 from pyspark.sql import *
 from pyspark.sql.types import *
-from pyspark.sql.types import DoubleType
 import pyspark.sql.functions as F
 import pandas as pd
 import numpy as np
 import joblib
 
-# TODO: Discard group if count of logs < 3
 
 # ------------------
-#        PARAMS
+#       PARAMS
 # ------------------
 
 ES_HOST = "http://localhost"
 SRC_NAME = "siae-pm"
-MODEL_PATH = "scripts/spark-ml/ann_model.joblib"
-DEST_INDEX = "prediction-pm"
+MODEL_PATH = "spark/ann_model/ann_model.joblib"
+MODULATION_FILE_PATH = "spark/ann_model/Project_good_modulation.csv"
+ES_LIB_PATH = "spark/elasticsearch-spark-20_2.12-7.12.0.jar"
 
 
 # ------------------
@@ -24,12 +29,12 @@ DEST_INDEX = "prediction-pm"
 
 # Init Spark session - add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
 spark = SparkSession.builder.config(
-    'spark.driver.extraClassPath', 'scripts/elasticsearch-spark-20_2.12-7.12.0.jar').config('spark.sql.session.timeZone', 'UTC').appName("ANN-Model-1.0").getOrCreate()
+    'spark.driver.extraClassPath', ES_LIB_PATH).config('spark.sql.session.timeZone', 'UTC').appName("ANN-Model-Batch").getOrCreate()
 
 # Data or var that should be shared by workers must be broadcasted
 # Broadcast the dataframe that contains 3 new feautures
-thr = spark.sparkContext.broadcast(pd.read_csv(
-    "scripts/spark-ml/Project_good_modulation.csv", low_memory=False))
+thr = spark.sparkContext.broadcast(
+    pd.read_csv(MODULATION_FILE_PATH, low_memory=False))
 
 # Broadcast the ML model
 ann_model = spark.sparkContext.broadcast(joblib.load(MODEL_PATH))
@@ -98,7 +103,6 @@ schema = StructType([
     StructField("ptx", LongType(), True),
     StructField("RxNominal", LongType(), True),
     StructField("Thr_min", LongType(), True)
-    # StructField("_metadata", MapType(StringType(), StringType(), True), True)
 ])
 
 
@@ -314,7 +318,9 @@ def make_window(df_grouped):
 # Input-> list of columns as list of pd.Series, out-> one column as pd.Series
 @F.pandas_udf(returnType=DoubleType(), functionType=F.PandasUDFType.SCALAR)
 def predict(*cols):
+  
     windows = pd.concat(cols, axis=1)
+    print(windows)
 
     # ------------------------------------------------------------
     # 6 - NORMALIZE VALUES - Based on ANN_model.py
@@ -369,7 +375,7 @@ while True:
 
     # 3 - FLAG spark_processed column to true on elasticsearch original table - let last and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
     # Use another window function to add row number (index 1 to group_count) to each group than to group_count and group_count - 1 index set spark_processed to false
-    # IMPORTANT: Cache else on updating also non-predicted rows are considered 
+    # IMPORTANT: Cache else on updating also non-predicted rows are considered
     w1 = Window.partitionBy("idlink", "ramo").orderBy("data")
     df = df.withColumn("row_number", F.row_number().over(w1)) \
         .withColumn("spark_processed", F.when(F.col("group_count") == F.col("row_number"), "false").when(F.col("group_count") - 1 == F.col("row_number"), "false").otherwise("true"))\
@@ -408,7 +414,7 @@ while True:
         .option("es.mapping.id", "id").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
         "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
 
-    #8 - CLEAR CACHE to prepare for next batch
+    # 8 - CLEAR CACHE to prepare for next batch
     spark.catalog.clearCache()
 
     '''processed_flag_df.write.format('csv').option('header', True).mode(

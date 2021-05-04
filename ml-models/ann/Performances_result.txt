@@ -1,65 +1,65 @@
-Accuracy automated: 0.8767395626242545 
-Accuracy manually: 0.8767395626242545 
-Precision per class automated: [0.5625     0.92727273 0.77777778 0.71875    0.97222222 0.97033898] 
+Accuracy automated: 0.9025844930417495 
+Accuracy manually: 0.9025844930417495 
+Precision per class automated: [0.67123288 0.92035398 0.875      0.73529412 0.97222222 0.9790795 ] 
 
 Precision per class manually: 
 Class number 0 
-Precision: 0.5625 
+Precision: 0.6712328767123288 
 
 Class number 1 
-Precision: 0.9272727272727272 
+Precision: 0.9203539823008849 
 
 Class number 2 
-Precision: 0.7777777777777778 
+Precision: 0.875 
 
 Class number 3 
-Precision: 0.71875 
+Precision: 0.7352941176470589 
 
 Class number 4 
 Precision: 0.9722222222222222 
 
 Class number 5 
-Precision: 0.9703389830508474 
+Precision: 0.9790794979079498 
 
-Recall per class automated: [0.78947368 0.87931034 0.7        0.60526316 0.94594595 0.93469388] 
+Recall per class automated: [0.85964912 0.89655172 0.7        0.65789474 0.94594595 0.95510204] 
 
 Recall per class manually: 
 Class number 0 
-Recall: 0.7894736842105263 
+Recall: 0.8596491228070176 
 
 Class number 1 
-Recall: 0.8793103448275862 
+Recall: 0.896551724137931 
 
 Class number 2 
 Recall: 0.7 
 
 Class number 3 
-Recall: 0.6052631578947368 
+Recall: 0.6578947368421053 
 
 Class number 4 
 Recall: 0.9459459459459459 
 
 Class number 5 
-Recall: 0.9346938775510204 
+Recall: 0.9551020408163265 
 
-F1-score automated: [0.65693431 0.90265487 0.73684211 0.65714286 0.95890411 0.95218295] 
+F1-score automated: [0.75384615 0.90829694 0.77777778 0.69444444 0.95890411 0.96694215] 
 
 F1-score per class manually: 
 Class number 0 
-Recall: 0.656934306569343 
+Recall: 0.7538461538461538 
 
 Class number 1 
-Recall: 0.902654867256637 
+Recall: 0.908296943231441 
 
 Class number 2 
-Recall: 0.7368421052631577 
+Recall: 0.7777777777777777 
 
 Class number 3 
-Recall: 0.6571428571428571 
+Recall: 0.6944444444444445 
 
 Class number 4 
 Recall: 0.9589041095890412 
 
 Class number 5 
-Recall: 0.9521829521829521 
+Recall: 0.9669421487603306 
 
