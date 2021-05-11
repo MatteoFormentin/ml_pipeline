@@ -29,7 +29,8 @@ ES_LIB_PATH = "spark/elasticsearch-spark-20_2.12-7.12.0.jar"
 
 # Init Spark session - add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
 spark = SparkSession.builder.config(
-    'spark.driver.extraClassPath', ES_LIB_PATH).config('spark.sql.session.timeZone', 'UTC').appName("ANN-Model-Batch").getOrCreate()
+    'spark.driver.extraClassPath', ES_LIB_PATH).config('spark.sql.session.timeZone', 'UTC').config('spark.executor.memory', '2g').appName("ANN-Model-Batch").getOrCreate()
+
 
 # Data or var that should be shared by workers must be broadcasted
 # Broadcast the dataframe that contains 3 new feautures
@@ -318,9 +319,8 @@ def make_window(df_grouped):
 # Input-> list of columns as list of pd.Series, out-> one column as pd.Series
 @F.pandas_udf(returnType=DoubleType(), functionType=F.PandasUDFType.SCALAR)
 def predict(*cols):
-  
+
     windows = pd.concat(cols, axis=1)
-    print(windows)
 
     # ------------------------------------------------------------
     # 6 - NORMALIZE VALUES - Based on ANN_model.py
@@ -369,8 +369,12 @@ while True:
 
     # 2 - FILTER groups that have less than 3 logs inside
     # Add a new column group_count that contains the number of rows for each group idlink, ramo
+    # Add a new column uas_count that contains the number of seconds of uas for each group idlink, ramo
+    # IMPORTANT: filter only for group count here, since links groups with uas less than zero should be marked as processed and then dropped from df
+    # we do not need them for future prediction (only if they are the last two, but it is handled later)
     w = Window.partitionBy("idlink", "ramo")
     df = df.withColumn("group_count", F.count(F.col("idlink")).over(w)) \
+        .withColumn("uas_count", F.count(F.col("uas")).over(w)) \
         .where(F.col("group_count") >= 3)
 
     # 3 - FLAG spark_processed column to true on elasticsearch original table - let last and last - 1 logs of each idlink, ramo group unprocessed in order to make next window complete
@@ -382,8 +386,27 @@ while True:
         .drop("_metadata", "row_number").cache()
 
     # 4 - PREPROCESS Apply preprocess function
-    preprocessed_df = df.groupBy(
+    # Filter only groups that have sum of uas greater than zero
+    preprocessed_df = df.where(F.col("uas_count") > 0).groupBy(
         F.col("idlink"), F.col("ramo")).apply(make_window)
+
+    '''
+
+    csv_df = preprocessed_df.select(F.col('acmEngine'), F.col(
+        'esN-2'), F.col('sesN-2'), F.col('txMaxAN-2'), F.col('txminAN-2'), F.col('rxmaxAN-2'), F.col('rxminAN-2'),
+        F.col('txMaxBN-2'), F.col('txminBN-2'), F.col('rxmaxBN-2'), F.col('rxminBN-2'), F.col(
+        'esN-1'), F.col('sesN-1'), F.col('txMaxAN-1'), F.col('txminAN-1'),
+        F.col('rxmaxAN-1'), F.col('rxminAN-1'), F.col('txMaxBN-1'), F.col('txminBN-1'), F.col(
+            'rxmaxBN-1'), F.col('rxminBN-1'), F.col('esN'), F.col('sesN'),
+        F.col('txMaxAN'), F.col('txminAN'), F.col('rxmaxAN'), F.col('rxminAN'), F.col(
+        'txMaxBN'), F.col('txminBN'), F.col('rxmaxBN'), F.col('rxminBN'),
+        F.col('lowthr'), F.col('ptx'), F.col('RxNominal'), F.col('Thr_min'))
+
+    csv_df.write.format('csv').option('header', True).mode(
+        'overwrite').option('sep', ',').save('to_pred.csv')
+
+    
+    '''
 
     # 5 - PREDICT -> add a new column to preprocessed_df that contains the class
     predicted_df = preprocessed_df.withColumn("prediction", predict(F.col('acmEngine'), F.col(

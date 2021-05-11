@@ -81,6 +81,10 @@ def plot_confusion_matrix(y_true, y_pred, classes,
 windows = pd.read_csv(r"Labelled_Multiclass.csv")
 # Txt file in which the model selection results will be saved
 result = open("ANN_model_selection_results.txt", "w")
+test_df = pd.read_csv(
+    r"103020_pre.csv")
+
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 # ------------------------------------------------ DATA PRE-PROCESSING ------------------------------------------------
@@ -134,8 +138,7 @@ columns = windows.columns.values
 # The variable is used to address and drop some features not useful in the training and cross-validation phase
 # Delete the columns that are not useful
 windows = windows.drop(columns=columns[:8])
-for col in windows.columns:
-    print(col)
+
 # Delete the 'label' columns because we can't train a model using it as an input data
 windows = windows.drop(columns=['label'])
 # After the elimination of the useless columns our data are described by 35 features
@@ -145,7 +148,8 @@ X = windows.to_numpy()
 #            ------------------------------------------------------------------------------------------------
 
 #         ----------------------------------------- DATAFRAME SPLITTING -----------------------------------------
-test_percentage = 0.2  # Percentage of points contained in the test dataset (e.g., 20% = 0.2)
+# Percentage of points contained in the test dataset (e.g., 20% = 0.2)
+test_percentage = 0.2
 
 # Perform a Train-Test split maintaining the distribution of the classes inside the splits
 # Parameters explanation:
@@ -250,18 +254,21 @@ Best_neurons = 50
 Best_activation = "logistic"
 
 # Scale the data (Manually)
-mean_train = np.mean(X_train, axis=0)  # Mean per feature of the training data
+'''mean_train = np.mean(X_train, axis=0)  # Mean per feature of the training data
 print("MEAN:")
 print(mean_train)
 std_train = np.std(X_train, axis=0)  # Std per feature of the training data
 print("STD:")
-print(std_train)
+print(std_train)'''
 # X_train = (X_train-mean_train) / std_train  # Scaling training data
 # X_test = (X_test-mean_train) / std_train  # Scaling validation data
-print(X_train)
 # Scale the data
-X_train = scaler.fit_transform(X_train)  # Scale the train data as (value - mean) / std
-X_test = scaler.transform(X_test)  # scale the test data as (value - mean_train) / std_train
+# Scale the train data as (value - mean) / std
+X_train = scaler.fit_transform(X_train)
+# scale the test data as (value - mean_train) / std_train
+X_test = scaler.transform(X_test)
+X_test_df = scaler.transform(test_df.to_numpy())
+
 
 # Transform the labels using One-Hot-Encoding
 # e.g., Total number of label = 6 (from 0 to 5),
@@ -270,13 +277,14 @@ y_train_cat = to_categorical(y_train, num_classes=n_label)
 y_test_cat = to_categorical(y_test, num_classes=n_label)
 
 # Create the object of the best model according to Cross-Validation
-size = (Best_neurons,) * Best_layers  # Create the structure of the Artificial Neural Network
+# Create the structure of the Artificial Neural Network
+size = (Best_neurons,) * Best_layers
 ann = MLPClassifier(hidden_layer_sizes=size, activation=Best_activation,
                     solver='adam', learning_rate='invscaling', max_iter=10000)
 # Train the model
 ann.fit(X_train, y_train_cat)
 
-#Save the model
+# Save the model
 dump(ann, 'ann_model.joblib')
 
 # Predict the label on the test set
@@ -286,6 +294,17 @@ y_predicted = ann.predict(X_test)
 y_predicted = np.argmax(y_predicted, axis=1)
 # For each point, predict the probability to belong to each class
 y_probability = ann.predict_proba(X_test)
+
+
+df_pred = ann.predict(X_test_df)
+df_pred = np.argmax(df_pred, axis=1)
+
+counter_lab = [0, 0, 0, 0, 0, 0]
+for p in df_pred:
+    counter_lab[p] += 1
+
+print(counter_lab)
+
 # ----------------------------------------------------------------------------------------------------------------------
 
 # ------------------------------------------ SAVE THE PERFORMANCES PER CLASS ------------------------------------------
@@ -303,18 +322,20 @@ recall = [0] * n_label  # recall list
 
 # Write the accuracy inside the performances file
 #performances.write("Accuracy automated: %s \n" % mt.classification.accuracy_score(y_test, y_predicted))
-performances.write("Accuracy automated: %s \n" % mt.accuracy_score(y_test, y_predicted))
+performances.write("Accuracy automated: %s \n" %
+                   mt.accuracy_score(y_test, y_predicted))
 #                                 --------------------- MANUALLY ---------------------
 
 # Write the accuracy inside the performances file
-performances.write("Accuracy manually: %s \n" % str(len(acc.loc[acc['ground_truth'] == acc['predicted']]) / len(acc)))
+performances.write("Accuracy manually: %s \n" % str(
+    len(acc.loc[acc['ground_truth'] == acc['predicted']]) / len(acc)))
 #           --------------------------------------------------------------------------------------------------
 
 #           -------------------------------------------- PRECISION --------------------------------------------
 #                                 --------------------- AUTOMATED ---------------------
 
 # Write the precision inside the performances file
-#performances.write("Precision per class automated: %s \n"
+# performances.write("Precision per class automated: %s \n"
 #                   % mt.classification.precision_score(y_test, y_predicted, labels=labels, average=None))
 performances.write("Precision per class automated: %s \n"
                    % mt.precision_score(y_test, y_predicted, labels=labels, average=None))
@@ -324,12 +345,15 @@ performances.write("Precision per class automated: %s \n"
 performances.write("\nPrecision per class manually: \n")
 for i in range(n_label):
     performances.write("Class number %s \n" % str(i))
-    human = acc.loc[acc['predicted'] == i]['ground_truth']  # we pick all the ground truth in a list
-    predicted = acc.loc[acc['predicted'] == i]['predicted']  # we pick the labels assigned to the clustering
+    # we pick all the ground truth in a list
+    human = acc.loc[acc['predicted'] == i]['ground_truth']
+    # we pick the labels assigned to the clustering
+    predicted = acc.loc[acc['predicted'] == i]['predicted']
     measure = pd.DataFrame()
     measure['ground_truth'] = human
     measure['predicted'] = predicted
-    precision[i] = len(measure.loc[measure['ground_truth'] == measure['predicted']]) / len(measure)
+    precision[i] = len(measure.loc[measure['ground_truth']
+                                   == measure['predicted']]) / len(measure)
     performances.write("Precision: %s \n\n" % precision[i])
 #           --------------------------------------------------------------------------------------------------
 
@@ -337,7 +361,7 @@ for i in range(n_label):
 #                                 --------------------- AUTOMATED ---------------------
 
 # Write the recall inside the performances file
-#performances.write("Recall per class automated: %s \n"
+# performances.write("Recall per class automated: %s \n"
 #                   % mt.classification.recall_score(y_test, y_predicted, labels=labels, average=None))
 performances.write("Recall per class automated: %s \n"
                    % mt.recall_score(y_test, y_predicted, labels=labels, average=None))
@@ -347,12 +371,15 @@ performances.write("Recall per class automated: %s \n"
 performances.write("\nRecall per class manually: \n")
 for i in range(n_label):
     performances.write("Class number %s \n" % str(i))
-    human = acc.loc[acc['ground_truth'] == i]['ground_truth']  # we pick all the ground truth in a list
-    predicted = acc.loc[acc['ground_truth'] == i]['predicted']  # we pick the label assigned to the clustering
+    # we pick all the ground truth in a list
+    human = acc.loc[acc['ground_truth'] == i]['ground_truth']
+    # we pick the label assigned to the clustering
+    predicted = acc.loc[acc['ground_truth'] == i]['predicted']
     measure = pd.DataFrame()
     measure['ground_truth'] = human
     measure['predicted'] = predicted
-    recall[i] = len(measure.loc[measure['ground_truth'] == measure['predicted']]) / len(measure)
+    recall[i] = len(measure.loc[measure['ground_truth'] ==
+                                measure['predicted']]) / len(measure)
     performances.write("Recall: %s \n\n" % recall[i])
 #           --------------------------------------------------------------------------------------------------
 
@@ -360,7 +387,7 @@ for i in range(n_label):
 #                                 --------------------- AUTOMATED ---------------------
 
 # Write the f1-score inside the performances file
-#performances.write("F1-score autom#ated: %s \n"
+# performances.write("F1-score autom#ated: %s \n"
 #                   % mt.classification.f1_score(y_test, y_predicted, labels=labels, average=None))
 performances.write("F1-score automated: %s \n"
                    % mt.f1_score(y_test, y_predicted, labels=labels, average=None))

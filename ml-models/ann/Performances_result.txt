@@ -1,65 +1,65 @@
-Accuracy automated: 0.9025844930417495 
-Accuracy manually: 0.9025844930417495 
-Precision per class automated: [0.67123288 0.92035398 0.875      0.73529412 0.97222222 0.9790795 ] 
+Accuracy automated: 0.8906560636182903 
+Accuracy manually: 0.8906560636182903 
+Precision per class automated: [0.6025641  0.92592593 1.         0.77142857 0.94594595 0.97478992] 
 
 Precision per class manually: 
 Class number 0 
-Precision: 0.6712328767123288 
+Precision: 0.6025641025641025 
 
 Class number 1 
-Precision: 0.9203539823008849 
+Precision: 0.9259259259259259 
 
 Class number 2 
-Precision: 0.875 
+Precision: 1.0 
 
 Class number 3 
-Precision: 0.7352941176470589 
+Precision: 0.7714285714285715 
 
 Class number 4 
-Precision: 0.9722222222222222 
+Precision: 0.9459459459459459 
 
 Class number 5 
-Precision: 0.9790794979079498 
+Precision: 0.9747899159663865 
 
-Recall per class automated: [0.85964912 0.89655172 0.7        0.65789474 0.94594595 0.95510204] 
+Recall per class automated: [0.8245614  0.86206897 0.7        0.71052632 0.94594595 0.94693878] 
 
 Recall per class manually: 
 Class number 0 
-Recall: 0.8596491228070176 
+Recall: 0.8245614035087719 
 
 Class number 1 
-Recall: 0.896551724137931 
+Recall: 0.8620689655172413 
 
 Class number 2 
 Recall: 0.7 
 
 Class number 3 
-Recall: 0.6578947368421053 
+Recall: 0.7105263157894737 
 
 Class number 4 
 Recall: 0.9459459459459459 
 
 Class number 5 
-Recall: 0.9551020408163265 
+Recall: 0.9469387755102041 
 
-F1-score automated: [0.75384615 0.90829694 0.77777778 0.69444444 0.95890411 0.96694215] 
+F1-score automated: [0.6962963  0.89285714 0.82352941 0.73972603 0.94594595 0.96066253] 
 
 F1-score per class manually: 
 Class number 0 
-Recall: 0.7538461538461538 
+Recall: 0.6962962962962963 
 
 Class number 1 
-Recall: 0.908296943231441 
+Recall: 0.8928571428571429 
 
 Class number 2 
-Recall: 0.7777777777777777 
+Recall: 0.8235294117647058 
 
 Class number 3 
-Recall: 0.6944444444444445 
+Recall: 0.7397260273972601 
 
 Class number 4 
-Recall: 0.9589041095890412 
+Recall: 0.9459459459459459 
 
 Class number 5 
-Recall: 0.9669421487603306 
+Recall: 0.9606625258799173 
 
