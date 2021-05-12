@@ -319,7 +319,6 @@ def make_window(df_grouped):
 # Input-> list of columns as list of pd.Series, out-> one column as pd.Series
 @F.pandas_udf(returnType=DoubleType(), functionType=F.PandasUDFType.SCALAR)
 def predict(*cols):
-
     windows = pd.concat(cols, axis=1)
 
     # ------------------------------------------------------------
@@ -390,24 +389,6 @@ while True:
     preprocessed_df = df.where(F.col("uas_count") > 0).groupBy(
         F.col("idlink"), F.col("ramo")).apply(make_window)
 
-    '''
-
-    csv_df = preprocessed_df.select(F.col('acmEngine'), F.col(
-        'esN-2'), F.col('sesN-2'), F.col('txMaxAN-2'), F.col('txminAN-2'), F.col('rxmaxAN-2'), F.col('rxminAN-2'),
-        F.col('txMaxBN-2'), F.col('txminBN-2'), F.col('rxmaxBN-2'), F.col('rxminBN-2'), F.col(
-        'esN-1'), F.col('sesN-1'), F.col('txMaxAN-1'), F.col('txminAN-1'),
-        F.col('rxmaxAN-1'), F.col('rxminAN-1'), F.col('txMaxBN-1'), F.col('txminBN-1'), F.col(
-            'rxmaxBN-1'), F.col('rxminBN-1'), F.col('esN'), F.col('sesN'),
-        F.col('txMaxAN'), F.col('txminAN'), F.col('rxmaxAN'), F.col('rxminAN'), F.col(
-        'txMaxBN'), F.col('txminBN'), F.col('rxmaxBN'), F.col('rxminBN'),
-        F.col('lowthr'), F.col('ptx'), F.col('RxNominal'), F.col('Thr_min'))
-
-    csv_df.write.format('csv').option('header', True).mode(
-        'overwrite').option('sep', ',').save('to_pred.csv')
-
-    
-    '''
-
     # 5 - PREDICT -> add a new column to preprocessed_df that contains the class
     predicted_df = preprocessed_df.withColumn("prediction", predict(F.col('acmEngine'), F.col(
         'esN-2'), F.col('sesN-2'), F.col('txMaxAN-2'), F.col('txminAN-2'), F.col('rxmaxAN-2'), F.col('rxminAN-2'),
@@ -439,7 +420,4 @@ while True:
 
     # 8 - CLEAR CACHE to prepare for next batch
     spark.catalog.clearCache()
-
-    '''processed_flag_df.write.format('csv').option('header', True).mode(
-        'overwrite').option('sep', ',').save('df.csv')
-    '''
+    
