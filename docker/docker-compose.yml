@@ -188,6 +188,40 @@ services:
     networks:
       - cont-net
 
+  # SPARK CLUSTER
+  spark-master:
+    build: "build/spark"
+    hostname: spark-master
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080"
+    networks:
+      - cont-net
+
+  spark-worker:
+    build: "build/spark"
+    hostname: spark-worker
+    scale: 2 # Number of worker instances
+    environment:
+        - SPARK_MODE=worker
+        - SPARK_WORKER_MEMORY=1G
+        - SPARK_MASTER_URL=spark://spark-master:7077
+    networks:
+      - cont-net
+  
+  spark-driver:
+    build: "../spark/ann_model/"
+    hostname: spark-driver
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - SPARK_MASTER=spark://spark-master:7077
+    ports:
+      - "4040:4040"
+    networks:
+      - cont-net
+
 
 volumes:
   es01-data:
@@ -199,8 +233,6 @@ volumes:
   zookeeper-data:
     driver: local
   kafka01-data:
-    driver: local
-  zeppelin-notebook:
     driver: local
 
 networks:

@@ -10,27 +10,42 @@ import pyspark.sql.functions as F
 import pandas as pd
 import numpy as np
 import joblib
-
+import os
 
 # ------------------
 #       PARAMS
 # ------------------
 
-ES_HOST = "http://localhost"
-SRC_NAME = "siae-pm"
-MODEL_PATH = "spark/ann_model/ann_model.joblib"
-MODULATION_FILE_PATH = "spark/ann_model/Project_good_modulation.csv"
-ES_LIB_PATH = "spark/elasticsearch-spark-20_2.12-7.12.0.jar"
+# Enviroments needs to be setted on production only on the docker-compose file - used to distinguish when Spark runs in standlone (dev) or cluster inside docker (prod)
+ENVIRONMENT = os.getenv('ENVIRONMENT')
+
+INDEX_NAME = "siae-pm"
+MODEL_PATH = "./ann_model.joblib"
+MODULATION_FILE_PATH = "./Project_good_modulation.csv"
+# Path to es-spark library to add Elasticsearch integration - needed only on dev, in production is automatically downloaded
+ES_LIB_PATH = "elasticsearch-spark-20_2.12-7.12.0.jar"
+
+# On production exploit all the parallelism - connect to all available nodes
+if ENVIRONMENT == "production":
+    ES_HOST = "http://es01,http://es02,http://es03"
+else:
+    # On development we are otside the netwrork of docker - like in a wan - we can only access the master binded on localhost:9200
+    ES_HOST = "http://localhost"
 
 
 # ------------------
 #     SPARK INIT
 # ------------------
 
-# Init Spark session - add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
-spark = SparkSession.builder.config(
-    'spark.driver.extraClassPath', ES_LIB_PATH).config('spark.sql.session.timeZone', 'UTC').config('spark.executor.memory', '2g').appName("ANN-Model-Batch").getOrCreate()
-
+# Init Spark session -
+if ENVIRONMENT == "production":
+    # in production es-spark is downloaded by the spark-submit script
+    spark = SparkSession.builder.appName("ANN-Model-Batch").getOrCreate()
+else:
+    os.chdir("spark/ann_model/src")
+    # On development no spark-submit is used, so must add elasticsearch-spark-20_2.12-7.12.0.jar to provide Elasticsearch itegration
+    spark = SparkSession.builder.config(
+        'spark.driver.extraClassPath', ES_LIB_PATH).config('spark.sql.session.timeZone', 'UTC').config('spark.executor.memory', '2g').appName("ANN-Model-Batch").getOrCreate()
 
 # Data or var that should be shared by workers must be broadcasted
 # Broadcast the dataframe that contains 3 new feautures
@@ -362,8 +377,8 @@ while True:
     # 1 - READ the  dataset from Elasticsearch, query only documents where spark_processed == false
     # Also add id column retrived from metadata in order to update es spark_processed col
     reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
-        "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)
-    df = reader.load(SRC_NAME).withColumn("id", F.element_at(F.col(
+        "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)  # .option("es.nodes.resolve.hostname", "false")
+    df = reader.load(INDEX_NAME).withColumn("id", F.element_at(F.col(
         "_metadata"), "_id")).orderBy(F.col("data").asc()).drop("prediction")  # drop prediction: when old prediction must be kept null is provided in the new prediction col
 
     # 2 - FILTER groups that have less than 3 logs inside
@@ -416,8 +431,7 @@ while True:
     # 7 - SAVE PREDICTION TO ES prediction to Elasticsearch and update flag
     to_write_df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
         .option("es.mapping.id", "id").option("es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option(
-        "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", SRC_NAME).save()
+        "es.mode", "false").option("es.nodes", ES_HOST).option("es.resource", INDEX_NAME).save()
 
     # 8 - CLEAR CACHE to prepare for next batch
     spark.catalog.clearCache()
-    

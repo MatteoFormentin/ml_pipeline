@@ -1,0 +1,16 @@
+FROM python:slim
+
+RUN mkdir /usr/share/man/man1/
+RUN apt-get update \
+    && apt-get install -y default-jre scala git wget procps bash \
+    && apt-get clean 
+
+RUN pip3 install pyspark==3.1.1 scikit-learn joblibspark pandas pyarrow
+
+RUN mkdir ann_model
+COPY ./src ./ann_model
+
+CMD cd ann_model;   spark-submit \
+    --master spark://spark-master:7077 \
+    --jars elasticsearch-spark-20_2.12-7.12.0.jar \
+    ann_model_batch.py

@@ -2,7 +2,7 @@ FROM python:slim
 
 RUN mkdir /usr/share/man/man1/
 RUN apt-get update \
-    && apt-get install -y default-jre scala git wget procps \
+    && apt-get install -y default-jre scala git wget procps bash \
     && apt-get clean 
 
 RUN wget https://downloads.apache.org/spark/spark-3.1.1/spark-3.1.1-bin-hadoop2.7.tgz
@@ -13,7 +13,7 @@ RUN echo "export SPARK_HOME=/opt/spark" >> ~/.profile \
     && echo "export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin" >> ~/.profile \
     && echo "export PYSPARK_PYTHON=/usr/bin/python3" >> ~/.profile 
 
-RUN pip3 install scikit-learn joblibspark
+RUN pip3 install scikit-learn joblibspark pandas pyarrow
 
 EXPOSE 7077
 EXPOSE 8080
