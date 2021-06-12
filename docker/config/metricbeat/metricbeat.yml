@@ -25,21 +25,21 @@ metricbeat.modules:
   - module: elasticsearch
     xpack.enabled: true
     period: 10s
-    hosts: ["http://es01:9200", "http://es02:9200", "http://es03:9200"]
+    hosts: ["http://es:9200"]
 
   - module: logstash
     metricsets:
       - node
       - node_stats
     period: 10s
-    hosts: ["ls01:9600"]
+    hosts: ["ls:9600"]
     xpack.enabled: true
 
   - module: kibana
     metricsets:
       - stats
     period: 10s
-    hosts: ["kib01:5601"]
+    hosts: ["kib:5601"]
     xpack.enabled: true
 
   - module: zookeeper
@@ -53,7 +53,7 @@ metricbeat.modules:
       - consumergroup
       - partition
     period: 10s
-    hosts: ["kafka01:9092"]
+    hosts: ["kafka:9092"]
     client_id: metricbeat
 
   # Metrics collected from a Kafka broker using Jolokia
@@ -63,15 +63,15 @@ metricbeat.modules:
       - consumer
       - producer
     period: 10s
-    hosts: ["kafka01:8778"]
+    hosts: ["kafka:8778"]
 
 output:
   elasticsearch:
-    hosts: ["es01:9200", "es02:9200", "es03:9200"]
+    hosts: ["es:9200"]
     ilm.enabled: true
     ilm.rollover_alias: "metricbeat"
     ilm.pattern: "{now/d}-000001"
 
 # Only for loading default dashboards
-setup.kibana.host: "http://kib01:5601"
+setup.kibana.host: "http://kib:5601"
 setup.dashboards.enabled: false #enable first time to load dashboards
