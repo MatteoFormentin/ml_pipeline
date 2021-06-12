@@ -1,0 +1,354 @@
+version: "3.8"
+services:
+  # ELASTICSEARCH - cannot be auto scaled due to volume sharing problem - to scale, add a new service with configuration
+  es01:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+    hostname: es01
+    restart: always
+    environment:
+      #- "ELASTICSEARCH_USERNAME=elastic"
+      #- "ELASTIC_PASSWORD=password"
+      - node.name=es01
+      #- discovery.type=single-node #Only if single node
+      - discovery.seed_hosts=es02,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/elasticsearch/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      # Data persistence
+      - type: volume
+        source: es01-data
+        target: /usr/share/elasticsearch/data
+    ports:
+      - 9200:9200
+      - 9300:9300
+    networks:
+      - cont-net
+
+  es02:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+    hostname: es02
+    restart: always
+    environment:
+      #- "ELASTICSEARCH_USERNAME=elastic"
+      #- "ELASTIC_PASSWORD=password"
+      - node.name=es02
+      #- discovery.type=single-node #Only if single nodecker
+      - discovery.seed_hosts=es01,es03
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/elasticsearch/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      # Data persistence
+      - type: volume
+        source: es02-data
+        target: /usr/share/elasticsearch/data
+    networks:
+      - cont-net
+
+  es03:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
+    hostname: es03
+    restart: always
+    environment:
+      #- "ELASTICSEARCH_USERNAME=elastic"
+      #- "ELASTIC_PASSWORD=password"
+      - node.name=es03
+      #- discovery.type=single-node #Only if single node
+      - discovery.seed_hosts=es01,es02
+      - cluster.initial_master_nodes=es01,es02,es03
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/elasticsearch/elasticsearch.yml
+        target: /usr/share/elasticsearch/config/elasticsearch.yml
+        read_only: true
+      # Data persistence
+      - type: volume
+        source: es03-data
+        target: /usr/share/elasticsearch/data
+    networks:
+      - cont-net
+
+  # KIBANA
+  kib01:
+    image: docker.elastic.co/kibana/kibana:7.12.0
+    hostname: kib01
+    restart: always
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/kibana/kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+        read_only: true
+    ports:
+      - 5601:5601
+    networks:
+      - cont-net
+
+  # LOGSTASH - Can be scaled if every istance share the same pipelines
+  ls01:
+    image: docker.elastic.co/logstash/logstash:7.12.0
+    hostname: ls01
+    restart: always
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/logstash/logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+        read_only: true
+      # Pipeline -> put each pipeline in this folder in a separate file
+      - type: bind
+        source: ./config/logstash/pipeline
+        target: /usr/share/logstash/pipeline
+        read_only: true
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - cont-net
+
+  ls02:
+    image: docker.elastic.co/logstash/logstash:7.12.0
+    hostname: ls01
+    restart: always
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/logstash/logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+        read_only: true
+      # Pipeline -> put each pipeline in this folder in a separate file
+      - type: bind
+        source: ./config/logstash/pipeline
+        target: /usr/share/logstash/pipeline
+        read_only: true
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - cont-net
+
+  
+  ls03:
+    image: docker.elastic.co/logstash/logstash:7.12.0
+    hostname: ls01
+    restart: always
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/logstash/logstash.yml
+        target: /usr/share/logstash/config/logstash.yml
+        read_only: true
+      # Pipeline -> put each pipeline in this folder in a separate file
+      - type: bind
+        source: ./config/logstash/pipeline
+        target: /usr/share/logstash/pipeline
+        read_only: true
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - cont-net
+
+
+  # METRICBEAT - Collect metrics about pipeline adn store it in elasticsearch
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:7.12.0
+    hostname: metricbeat
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/metricbeat/production/metricbeat.yml
+        target: /usr/share/metricbeat/metricbeat.yml
+        read_only: true
+      # Pipeline -> put each pipeline in this folder in a separate file
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - cont-net
+
+  # KAFKA - Requires Zookeper to works and CMAK for gui management (optional)
+  zookeeper:
+    image: "bitnami/zookeeper:latest"
+    hostname: zookeeper
+    restart: always
+    ports:
+      - "2181:2181"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    volumes:
+      - zookeeper-data:/bitnami/zookeeper
+    networks:
+      - cont-net
+
+  kafka01: # if external access required expose 9092
+    image: "bitnami/kafka:latest"
+    hostname: kafka01
+    restart: always
+    environment:
+      - KAFKA_BROKER_ID=1
+      # In order to use internal and external clients to access Kafka brokers you need
+      # to configure one listener for each kind of clients.
+      # Internal: kafka01:9092 change CLIENT://kafka01:9092
+      # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka01:9092,EXTERNAL://ec2-15-161-59-127.eu-south-1.compute.amazonaws.com:9093
+      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR="3"
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR="3"
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR="3"
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS="0"
+    volumes:
+      - kafka01-data:/bitnami/kafka
+      - type: bind
+        source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External var needed to collect metrics
+        target: /usr/share/jolokia-jvm-1.6.1-agent.jar
+    ports:
+      - "9093:9093"
+    networks:
+      - cont-net
+  
+  kafka02: # if external access required expose 9092
+    image: "bitnami/kafka:latest"
+    hostname: kafka01
+    restart: always
+    environment:
+      - KAFKA_BROKER_ID=1
+      # In order to use internal and external clients to access Kafka brokers you need
+      # to configure one listener for each kind of clients.
+      # Internal: kafka01:9092 change CLIENT://kafka01:9092
+      # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka02:9092,EXTERNAL://ec2-15-161-59-127.eu-south-1.compute.amazonaws.com:9094
+      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR="3"
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR="3"
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR="3"
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS="0"
+    volumes:
+      - kafka01-data:/bitnami/kafka
+      - type: bind
+        source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External var needed to collect metrics
+        target: /usr/share/jolokia-jvm-1.6.1-agent.jar
+    ports:
+      - "9094:9094"
+    networks:
+      - cont-net
+
+  kafka03: # if external access required expose 9092
+    image: "bitnami/kafka:latest"
+    hostname: kafka01
+    restart: always
+    environment:
+      - KAFKA_BROKER_ID=1
+      # In order to use internal and external clients to access Kafka brokers you need
+      # to configure one listener for each kind of clients.
+      # Internal: kafka01:9092 change CLIENT://kafka01:9092
+      # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
+      - ALLOW_PLAINTEXT_LISTENER=yes
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka03:9092,EXTERNAL://ec2-15-161-59-127.eu-south-1.compute.amazonaws.com:9095
+      - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
+      - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR="3"
+      - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR="3"
+      - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR="3"
+      - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS="0"
+    volumes:
+      - kafka01-data:/bitnami/kafka
+      - type: bind
+        source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External var needed to collect metrics
+        target: /usr/share/jolokia-jvm-1.6.1-agent.jar
+    ports:
+      - "9095:9095"
+    networks:
+      - cont-net
+
+  # SPARK CLUSTER
+  spark-master:
+    build: "build/spark"
+    hostname: spark-master
+    restart: always
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "8080:8080" #Spark Web UI
+    networks:
+      - cont-net
+
+  spark-worker:
+    build: "build/spark"
+    hostname: spark-worker
+    restart: always
+    scale: 2 # Number of worker instances
+    environment:
+        - SPARK_MODE=worker
+        - SPARK_WORKER_MEMORY=1G
+        - SPARK_MASTER_URL=spark://spark-master:7077
+    networks:
+      - cont-net
+  
+  spark-driver:
+    build: "../spark/ann_model/"
+    hostname: spark-driver
+    restart: always
+    environment:
+      - ENVIRONMENT=production
+      - SPARK_MASTER=spark://spark-master:7077
+    ports:
+      - "4040:4040"
+    networks:
+      - cont-net
+
+
+volumes:
+  es01-data:
+    driver: local
+  es02-data:
+    driver: local
+  es03-data:
+    driver: local
+  zookeeper-data:
+    driver: local
+  kafka01-data:
+    driver: local
+
+networks:
+  cont-net:
+    driver: bridge
