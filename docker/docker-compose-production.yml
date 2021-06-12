@@ -238,7 +238,7 @@ services:
   
   kafka02: # if external access required expose 9092
     image: "bitnami/kafka:latest"
-    hostname: kafka01
+    hostname: kafka02
     restart: always
     environment:
       - KAFKA_BROKER_ID=2
@@ -270,7 +270,7 @@ services:
 
   kafka03: # if external access required expose 9092
     image: "bitnami/kafka:latest"
-    hostname: kafka01
+    hostname: kafka03
     restart: always
     environment:
       - KAFKA_BROKER_ID=3
