@@ -104,22 +104,6 @@ services:
     networks:
       - cont-net
 
-  # KIBANA
-  kib01:
-    image: docker.elastic.co/kibana/kibana:7.12.0
-    hostname: kib01
-    restart: always
-    volumes:
-      # Configuration file
-      - type: bind
-        source: ./config/kibana/kibana.yml
-        target: /usr/share/kibana/config/kibana.yml
-        read_only: true
-    ports:
-      - 5601:5601
-    networks:
-      - cont-net
-
   # LOGSTASH
   ls01:
     image: docker.elastic.co/logstash/logstash:7.12.0
@@ -179,6 +163,22 @@ services:
         read_only: true
     environment:
       LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - cont-net
+
+  # KIBANA
+  kib01:
+    image: docker.elastic.co/kibana/kibana:7.12.0
+    hostname: kib01
+    restart: always
+    volumes:
+      # Configuration file
+      - type: bind
+        source: ./config/kibana/production/kibana.yml
+        target: /usr/share/kibana/config/kibana.yml
+        read_only: true
+    ports:
+      - 5601:5601
     networks:
       - cont-net
 
@@ -292,7 +292,7 @@ services:
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9095
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka03:9092,EXTERNAL://${PUBLIC_IP}:9095
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181 
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
       - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
@@ -325,7 +325,7 @@ services:
     build: "build/spark"
     hostname: spark-worker
     restart: always
-    scale: 2 # Number of worker instances
+    scale: 4 # Number of worker instances
     environment:
         - SPARK_MODE=worker
         - SPARK_WORKER_MEMORY=1G

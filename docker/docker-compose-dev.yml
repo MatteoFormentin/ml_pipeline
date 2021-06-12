@@ -72,7 +72,7 @@ services:
     volumes:
       # Configuration file
       - type: bind
-        source: ./config/kibana/kibana.yml
+        source: ./config/kibana/dev/kibana.yml
         target: /usr/share/kibana/config/kibana.yml
         read_only: true
     ports:
