@@ -62,16 +62,18 @@ class Controller():
             total_log_processed = 0
             while not len(self.producers) == 0:
                 for p in self.producers:
-                    if not p.isRunning():
+                    if p.isRunning():
+                        p.produceOneLog()
+
+                    else:
                         print("Producer %s finished simulation. %d logs injected.                             " %
                               (p.getProducerId(), p.getProcessedLogs()))
                         total_log_processed +=p.getProcessedLogs()
                         self.producers.remove(p)
                         
-
                 print("Active producers: %d" % (len(self.producers)), end='\r')
+                time.sleep(self.interval)
 
-                time.sleep(1)
 
             # Calculate time elapsed
             s = (datetime.datetime.now() - starting_time).seconds
@@ -141,7 +143,6 @@ class Controller():
 
                 p = Producer(producer_id, full_path, self.kafka_broker,
                              self.kafka_topic, self.interval)
-                p.start()
                 self.producers.append(p)
                 spawned_count += 1
                 if spawned_count >= self.limit:

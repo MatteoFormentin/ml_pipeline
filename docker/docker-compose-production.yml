@@ -1,6 +1,16 @@
+#
+#   DATA INGESTION PIPELINE FOR MACHINE LEARNING
+#   Production Version
+#
+#   Before running this, set PUBLIC_IP env with the public ip address 
+#   of the machine to make Kafka cluster listen on the machine ip.
+#
+#
+
+
 version: "3.8"
 services:
-  # ELASTICSEARCH - cannot be auto scaled due to volume sharing problem - to scale, add a new service with configuration
+  # ELASTICSEARCH CLUSTER
   es01:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
     hostname: es01
@@ -110,7 +120,7 @@ services:
     networks:
       - cont-net
 
-  # LOGSTASH - Can be scaled if every istance share the same pipelines
+  # LOGSTASH
   ls01:
     image: docker.elastic.co/logstash/logstash:7.12.0
     hostname: ls01
@@ -190,7 +200,7 @@ services:
     networks:
       - cont-net
 
-  # KAFKA - Requires Zookeper to works and CMAK for gui management (optional)
+  # KAFKA CLUSTER - Requires Zookeper to works and CMAK for gui management (optional)
   zookeeper:
     image: "bitnami/zookeeper:latest"
     hostname: zookeeper
@@ -217,7 +227,7 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka01:9092,EXTERNAL://ec2-15-161-59-127.eu-south-1.compute.amazonaws.com:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka01:9092,EXTERNAL://${PUBLIC_IP}:9093
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
@@ -249,7 +259,7 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9094
-      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka02:9092,EXTERNAL://ec2-15-161-59-127.eu-south-1.compute.amazonaws.com:9094
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka02:9092,EXTERNAL://${PUBLIC_IP}:9094
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
@@ -280,7 +290,7 @@ services:
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9095
-      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka03:9092,EXTERNAL://ec2-15-161-59-127.eu-south-1.compute.amazonaws.com:9095
+      - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka03:9092,EXTERNAL://${PUBLIC_IP}:9095
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true

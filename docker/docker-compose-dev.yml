@@ -1,3 +1,17 @@
+#
+#   DATA INGESTION PIPELINE FOR MACHINE LEARNING
+#   Production Version
+#
+#   Minimal version with one instance per application- for development purpose
+#   Spark is not provided as a container - install pysapark on the local machine through pip and run 
+#
+#   python3 spark/ann_model/src/ann_model_batch.py 
+#
+#   After docker compose starts the pipeline.
+#   Note: netsim must run on the same machine for kafka to work
+#
+#
+
 version: "3.8"
 services:
   # ELASTICSEARCH - cannot be auto scaled due to volume sharing problem - to scale, add a new service with configuration
@@ -103,10 +117,6 @@ services:
     restart: always
     environment:
       - KAFKA_BROKER_ID=1
-      # In order to use internal and external clients to access Kafka brokers you need
-      # to configure one listener for each kind of clients.
-      # Internal: kafka:9092 change CLIENT://kafka:9092
-      # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093

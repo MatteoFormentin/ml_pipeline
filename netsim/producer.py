@@ -1,47 +1,49 @@
 import pandas as pd
-import time
 from threading import Thread
 from datetime import datetime, timezone
+import json
+
+CHUNKSIZE = 10
 
 
-class Producer(Thread):
+class Producer:
     def __init__(self, producer_id, csv_path, kafka_broker, topic, interval):
-        Thread.__init__(self)
         self.run_flag = True
         self.producer_id = producer_id
         self.csv_path = csv_path
         self.topic = topic
         self.interval = interval
         self.counter = 0
+        self.reader = iter(pd.read_csv(self.csv_path, chunksize=CHUNKSIZE))
+        self.chunk = None
+        self.chunk_counter = 0
+        self.chunk_size = 0
 
         # IMPORTANT: sets acks to "all" in order to avoid data missing in case of errors
         self.kafka_broker = kafka_broker
 
-    def run(self):
-        #self.total_log = len(df.index)
-        self.counter = 0
-        with pd.read_csv(self.csv_path, chunksize=100) as reader:
-            for chunk in reader:
-                # Process current chunck of file
-                for index, row in chunk.iterrows():
-                    if not self.run_flag:
-                        return
+    def produceOneLog(self):
 
-                    # Add timestamp of injection in unix ms
-                    ms_now = round(datetime.now(
-                        timezone.utc).timestamp() * 1e3)
+        if self.chunk_counter >= self.chunk_size:
+            try:
+                self.chunk = next(self.reader).to_dict("records")
+                self.chunk_counter = 0
+                self.chunk_size = len(self.chunk)
+            except StopIteration:
+                self.run_flag = False
 
-                    row["ingestion_ms"] = ms_now
-                    s = row.to_json().encode("utf-8")
-                    self.kafka_broker.send(self.topic, value=s)
+        else:
+            row = self.chunk[self.chunk_counter]
+            # Add timestamp of injection in unix ms
+            ms_now = round(datetime.now(
+                timezone.utc).timestamp() * 1e3)
 
-                    self.counter += 1
-                    time.sleep(self.interval)
+            row["ingestion_ms"] = ms_now
+            s = json.dumps(row).encode("utf-8")
+            self.kafka_broker.send(self.topic, value=s)
 
-        self.run_flag = False
-
-    def stop(self):
-        self.run_flag = False
+            self.chunk_counter += 1
+            self.counter += 1
 
     def isRunning(self):
         return self.run_flag
