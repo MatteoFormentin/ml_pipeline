@@ -39,7 +39,6 @@ class Producer:
                 timezone.utc).timestamp() * 1e3)
 
             row["ingestion_ms"] = ms_now
-            print(row)
             s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")
 
             self.kafka_broker.send(self.topic, value=s)
