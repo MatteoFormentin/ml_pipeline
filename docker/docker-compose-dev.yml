@@ -42,7 +42,7 @@ services:
         read_only: true
       # Pipeline -> put each pipeline in this folder in a separate file
       - type: bind
-        source: ./config/logstash/pipeline
+        source: ./config/logstash/pipeline/dev
         target: /usr/share/logstash/pipeline
         read_only: true
     environment:
@@ -73,7 +73,7 @@ services:
     volumes:
       # Configuration file
       - type: bind
-        source: ./config/metricbeat/metricbeat.yml
+        source: ./config/metricbeat/dev/metricbeat.yml
         target: /usr/share/metricbeat/metricbeat.yml
         read_only: true
       # Pipeline -> put each pipeline in this folder in a separate file
