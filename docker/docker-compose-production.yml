@@ -234,8 +234,6 @@ services:
       - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_NUM_PARTITIONS=3
-
-
     volumes:
       - kafka01-data:/bitnami/kafka
       - type: bind
@@ -266,7 +264,6 @@ services:
       - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_NUM_PARTITIONS=3
-
     volumes:
       - kafka02-data:/bitnami/kafka
       - type: bind
@@ -297,8 +294,6 @@ services:
       - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
       - KAFKA_CFG_NUM_PARTITIONS=3
-
-
     volumes:
       - kafka03-data:/bitnami/kafka
       - type: bind
@@ -325,7 +320,7 @@ services:
     build: "build/spark"
     hostname: spark-worker
     restart: always
-    scale: 4 # Number of worker instances
+    scale: 5 # Number of worker instances
     environment:
         - SPARK_MODE=worker
         - SPARK_WORKER_MEMORY=1G

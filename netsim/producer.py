@@ -1,7 +1,7 @@
 import pandas as pd
 from threading import Thread
 from datetime import datetime, timezone
-import json
+import simplejson
 
 CHUNKSIZE = 10
 
@@ -39,7 +39,9 @@ class Producer:
                 timezone.utc).timestamp() * 1e3)
 
             row["ingestion_ms"] = ms_now
-            s = json.dumps(row).encode("utf-8")
+            print(row)
+            s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")
+
             self.kafka_broker.send(self.topic, value=s)
 
             self.chunk_counter += 1
