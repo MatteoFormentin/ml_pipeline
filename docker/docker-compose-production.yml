@@ -133,7 +133,7 @@ services:
 
   ls02:
     image: docker.elastic.co/logstash/logstash:7.12.0
-    hostname: ls01
+    hostname: ls02
     restart: always
     volumes:
       # Configuration file
@@ -154,7 +154,7 @@ services:
   
   ls03:
     image: docker.elastic.co/logstash/logstash:7.12.0
-    hostname: ls01
+    hostname: ls03
     restart: always
     volumes:
       # Configuration file
