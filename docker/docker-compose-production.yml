@@ -226,7 +226,6 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=3
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-      - KAFKA_BROKER_ID=1
     volumes:
       - kafka01-data:/bitnami/kafka
       - type: bind
@@ -242,7 +241,7 @@ services:
     hostname: kafka01
     restart: always
     environment:
-      - KAFKA_BROKER_ID=1
+      - KAFKA_BROKER_ID=2
       # In order to use internal and external clients to access Kafka brokers you need
       # to configure one listener for each kind of clients.
       # Internal: kafka01:9092 change CLIENT://kafka01:9092
@@ -259,7 +258,6 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=3
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-      - KAFKA_BROKER_ID=2
     volumes:
       - kafka02-data:/bitnami/kafka
       - type: bind
@@ -275,7 +273,7 @@ services:
     hostname: kafka01
     restart: always
     environment:
-      - KAFKA_BROKER_ID=1
+      - KAFKA_BROKER_ID=3
       # In order to use internal and external clients to access Kafka brokers you need
       # to configure one listener for each kind of clients.
       # Internal: kafka01:9092 change CLIENT://kafka01:9092
@@ -292,7 +290,6 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_MIN_ISR=3
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=3
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
-      - KAFKA_BROKER_ID=3
     volumes:
       - kafka03-data:/bitnami/kafka
       - type: bind
