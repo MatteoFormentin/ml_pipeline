@@ -63,7 +63,7 @@ metricbeat.modules:
       - consumer
       - producer
     period: 10s
-    hosts: ["kafka01:9092", "kafka02:9092", "kafka03:9092"]
+    hosts: ["kafka02:8778", "kafka03:8778", "kafka03:8778"]
 
 output:
   elasticsearch:
