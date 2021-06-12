@@ -1,9 +1,10 @@
 version: "3.8"
 services:
-  # ELASTICSEARCH - cannot be scaled due to volume sharing problem
+  # ELASTICSEARCH - cannot be auto scaled due to volume sharing problem - to scale, add a new service with configuration
   es01:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
     hostname: es01
+    restart: always
     environment:
       #- "ELASTICSEARCH_USERNAME=elastic"
       #- "ELASTIC_PASSWORD=password"
@@ -36,6 +37,7 @@ services:
   es02:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
     hostname: es02
+    restart: always
     environment:
       #- "ELASTICSEARCH_USERNAME=elastic"
       #- "ELASTIC_PASSWORD=password"
@@ -65,6 +67,7 @@ services:
   es03:
     image: docker.elastic.co/elasticsearch/elasticsearch:7.12.0
     hostname: es03
+    restart: always
     environment:
       #- "ELASTICSEARCH_USERNAME=elastic"
       #- "ELASTIC_PASSWORD=password"
@@ -95,6 +98,7 @@ services:
   kib01:
     image: docker.elastic.co/kibana/kibana:7.12.0
     hostname: kib01
+    restart: always
     volumes:
       # Configuration file
       - type: bind
@@ -110,6 +114,7 @@ services:
   ls01:
     image: docker.elastic.co/logstash/logstash:7.12.0
     hostname: ls01
+    restart: always
     volumes:
       # Configuration file
       - type: bind
@@ -152,6 +157,7 @@ services:
   zookeeper:
     image: "bitnami/zookeeper:latest"
     hostname: zookeeper
+    restart: always
     ports:
       - "2181:2181"
     environment:
@@ -164,6 +170,7 @@ services:
   kafka01: # if external access required expose 9092
     image: "bitnami/kafka:latest"
     hostname: kafka01
+    restart: always
     environment:
       - KAFKA_BROKER_ID=1
       # In order to use internal and external clients to access Kafka brokers you need
@@ -192,16 +199,18 @@ services:
   spark-master:
     build: "build/spark"
     hostname: spark-master
+    restart: always
     environment:
       - SPARK_MODE=master
     ports:
-      - "8080:8080"
+      - "8080:8080" #Spark Web UI
     networks:
       - cont-net
 
   spark-worker:
     build: "build/spark"
     hostname: spark-worker
+    restart: always
     scale: 2 # Number of worker instances
     environment:
         - SPARK_MODE=worker

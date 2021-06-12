@@ -1,6 +1,7 @@
 import pandas as pd
 import time
 from threading import Thread
+from datetime import datetime, timezone
 
 
 class Producer(Thread):
@@ -26,6 +27,11 @@ class Producer(Thread):
                     if not self.run_flag:
                         return
 
+                    # Add timestamp of injection in unix ms
+                    ms_now = round(datetime.now(
+                        timezone.utc).timestamp() * 1e3)
+
+                    row["ingestion_ms"] = ms_now
                     s = row.to_json().encode("utf-8")
                     self.kafka_broker.send(self.topic, value=s)
 

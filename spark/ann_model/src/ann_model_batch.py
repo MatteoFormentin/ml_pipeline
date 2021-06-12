@@ -4,6 +4,7 @@
 # ---------------------------------------------------------
 
 
+from datetime import datetime, timezone
 from pyspark.sql import *
 from pyspark.sql.types import *
 import pyspark.sql.functions as F
@@ -118,7 +119,8 @@ schema = StructType([
     StructField("lowthr", FloatType(), True),
     StructField("ptx", LongType(), True),
     StructField("RxNominal", LongType(), True),
-    StructField("Thr_min", LongType(), True)
+    StructField("Thr_min", LongType(), True),
+    StructField("ingestion_ms", LongType(), True)
 ])
 
 
@@ -135,7 +137,7 @@ def make_window(df_grouped):
                         'txMaxBN-2', 'txminBN-2', 'rxmaxBN-2', 'rxminBN-2', 'esN-1', 'sesN-1', 'txMaxAN-1', 'txminAN-1',
                         'rxmaxAN-1', 'rxminAN-1', 'txMaxBN-1', 'txminBN-1', 'rxmaxBN-1', 'rxminBN-1', 'esN', 'sesN',
                         'txMaxAN', 'txminAN', 'rxmaxAN', 'rxminAN', 'txMaxBN', 'txminBN', 'rxmaxBN', 'rxminBN',
-                        'lowthr', 'ptx', 'RxNominal', 'Thr_min'
+                        'lowthr', 'ptx', 'RxNominal', 'Thr_min', 'ingestion_ms'
                         ])
 
     # Cast data column to datetime else cause problem with pyarrow
@@ -205,8 +207,9 @@ def make_window(df_grouped):
                 None,  # lowthr placeholder
                 None,  # ptx placeholder
                 chunk.iloc[0]['RxNominal'],
-                None  # Thr_min placeholder
+                None,  # Thr_min placeholder
                 # chunk.iloc[0]['_metadata']
+                chunk.iloc[2]['ingestion_ms']
             ]]
 
             # Create a one row dataframe
@@ -353,6 +356,22 @@ def predict(*cols):
     # Return Pandas Series of prediction.
     return pd.Series(pred)
 
+# Input-> list of columns as list of pd.Series, out-> one column as pd.Series
+
+
+@F.pandas_udf(returnType=LongType(), functionType=F.PandasUDFType.SCALAR)
+def calculate_latency(ingestion_ms_column):
+
+    latency = []
+
+    ms_now = round(datetime.now(timezone.utc).timestamp() * 1e3)
+    for index, ingestion_ms in ingestion_ms_column.items():
+        delta = ms_now - ingestion_ms
+        latency.append(delta)
+
+    # Return Pandas Series of prediction.
+    return pd.Series(latency)
+
 
 # ------------------
 #   SPARK PIPELINE
@@ -379,7 +398,7 @@ while True:
     reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
         "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)  # .option("es.nodes.resolve.hostname", "false")
     df = reader.load(INDEX_NAME).withColumn("id", F.element_at(F.col(
-        "_metadata"), "_id")).orderBy(F.col("data").asc()).drop("prediction")  # drop prediction: when old prediction must be kept null is provided in the new prediction col
+        "_metadata"), "_id")).orderBy(F.col("data").asc()).drop("prediction").drop("latency")  # drop prediction: when old prediction must be kept null is provided in the new prediction col - this will NOT delete the old predictions from es
 
     # 2 - FILTER groups that have less than 3 logs inside
     # Add a new column group_count that contains the number of rows for each group idlink, ramo
@@ -415,10 +434,14 @@ while True:
         'txMaxBN'), F.col('txminBN'), F.col('rxmaxBN'), F.col('rxminBN'),
         F.col('lowthr'), F.col('ptx'), F.col('RxNominal'), F.col('Thr_min')))
 
+    # Calculate processing latency
+    predicted_df = predicted_df.withColumn(
+        "latency", calculate_latency(F.col("ingestion_ms")))
+
     # 6 - JOIN Put prediction column values in correct rows on original dataset
     # Rename id col to id_2 - to avoid duplicate after join
     predicted_df = predicted_df.withColumnRenamed("id", "id_2").select(F.col("id_2"), F.col(
-        "prediction"))
+        "prediction"), F.col("latency"))
     # Left Join on row id - when no match on prediction is found null (empty) is added to the joined table prediction column - this avoid Es to perform update on that docƒ
     to_write_df = df.join(predicted_df, df.id == predicted_df.id_2, how='left')
     # Add predicted class label - null (empty) when no prediction has been made
@@ -426,7 +449,7 @@ while True:
         "prediction") == 2, "Interference").when(F.col("prediction") == 3, "Low Margin").when(F.col("prediction") == 4, "Self-Interference").when(F.col("prediction") == 5, "Hardware Failures"))
     # Select only column that needs to be updated
     to_write_df = to_write_df.select(F.col("id"), F.col("prediction"), F.col(
-        "prediction_label"), F.col("spark_processed"))
+        "prediction_label"), F.col("spark_processed"), F.col("latency"))
 
     # 7 - SAVE PREDICTION TO ES prediction to Elasticsearch and update flag
     to_write_df.write.format('org.elasticsearch.spark.sql').mode("append").option("es.write.operation", "upsert") \
