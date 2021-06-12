@@ -259,7 +259,7 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR="3"
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS="0"
     volumes:
-      - kafka01-data:/bitnami/kafka
+      - kafka02-data:/bitnami/kafka
       - type: bind
         source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External var needed to collect metrics
         target: /usr/share/jolokia-jvm-1.6.1-agent.jar
@@ -291,7 +291,7 @@ services:
       - KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR="3"
       - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS="0"
     volumes:
-      - kafka01-data:/bitnami/kafka
+      - kafka03-data:/bitnami/kafka
       - type: bind
         source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External var needed to collect metrics
         target: /usr/share/jolokia-jvm-1.6.1-agent.jar
@@ -347,6 +347,10 @@ volumes:
   zookeeper-data:
     driver: local
   kafka01-data:
+    driver: local
+  kafka02-data:
+    driver: local
+  kafka03-data:
     driver: local
 
 networks:
