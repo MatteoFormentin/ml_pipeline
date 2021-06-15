@@ -310,7 +310,7 @@ services:
     build: "build/spark"
     hostname: spark-worker
     restart: always
-    scale: 2 # Number of worker instances
+    scale: 4 # Number of worker instances
     environment:
         - SPARK_MODE=worker
         - SPARK_WORKER_MEMORY=4G

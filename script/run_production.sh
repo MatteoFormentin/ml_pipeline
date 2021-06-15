@@ -15,6 +15,6 @@ IP=$(curl https://ipinfo.io/ip)
 rm .env
 echo "PUBLIC_IP=$IP" > .env
 
-docker-compose -f  docker/docker-compose-production.yml  --env-file .env up -d --build
+docker-compose -f docker/docker-compose-production.yml  --env-file .env up -d --build
 
 exit 0
