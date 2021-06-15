@@ -19,7 +19,7 @@ curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compo
 chmod +x /usr/local/bin/docker-compose
 
 
-IP = ${curl https://ipinfo.io/ip}
+IP=$(curl https://ipinfo.io/ip)
 
 rm .env
 echo "PUBLIC_IP=$IP" > .env
