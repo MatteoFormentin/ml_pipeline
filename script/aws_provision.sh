@@ -25,6 +25,13 @@ apt-get -y install \
 curl -L "https://github.com/docker/compose/releases/download/1.29.2/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 chmod +x /usr/local/bin/docker-compose
 
+
+cp /etc/sysctl.conf /tmp/
+echo "vm.max_map_count = 262144" >> /tmp/sysctl.conf
+sudo cp /tmp/sysctl.conf /etc/
+
+sysctl -w vm.max_map_count=262144
+
 bash script/run_production.sh
 
 exit 0
