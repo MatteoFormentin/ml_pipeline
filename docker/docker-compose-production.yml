@@ -2,9 +2,16 @@
 #   DATA INGESTION PIPELINE FOR MACHINE LEARNING
 #   Production Version
 #
-#   Before running this, set PUBLIC_IP env with the public ip address 
-#   of the machine to make Kafka cluster listen on the machine ip.
+#   Before running this, set PUBLIC_IP env with the public ip address of the machine
+#   to make Kafka cluster listen on the machine ip: before running the pipeline create
+#   a .env file with as content PUBLIC_IP=host_public_ip in the root of the repo
 #
+#   On some host it could be required to set permission on metricbeat configuration file:
+#   chmod 644 docker/config/metricbeat/production/metricbeat.yml
+#
+#
+#   To run the pipeline:
+#   docker-compose -f  docker/docker-compose-production.yml  --env-file .env up -d --build
 #
 
 
@@ -16,14 +23,10 @@ services:
     hostname: es01
     restart: always
     environment:
-      #- "ELASTICSEARCH_USERNAME=elastic"
-      #- "ELASTIC_PASSWORD=password"
       - node.name=es01
-      #- discovery.type=single-node #Only if single node
       - discovery.seed_hosts=es02,es03
       - cluster.initial_master_nodes=es01,es02,es03
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
       memlock:
         soft: -1
@@ -49,14 +52,10 @@ services:
     hostname: es02
     restart: always
     environment:
-      #- "ELASTICSEARCH_USERNAME=elastic"
-      #- "ELASTIC_PASSWORD=password"
       - node.name=es02
-      #- discovery.type=single-node #Only if single nodecker
       - discovery.seed_hosts=es01,es03
       - cluster.initial_master_nodes=es01,es02,es03
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
       memlock:
         soft: -1
@@ -79,14 +78,10 @@ services:
     hostname: es03
     restart: always
     environment:
-      #- "ELASTICSEARCH_USERNAME=elastic"
-      #- "ELASTIC_PASSWORD=password"
       - node.name=es03
-      #- discovery.type=single-node #Only if single node
       - discovery.seed_hosts=es01,es02
       - cluster.initial_master_nodes=es01,es02,es03
       - bootstrap.memory_lock=true
-      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
     ulimits:
       memlock:
         soft: -1
@@ -120,8 +115,6 @@ services:
         source: ./config/logstash/pipeline/production
         target: /usr/share/logstash/pipeline
         read_only: true
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
       - cont-net
 
@@ -140,8 +133,6 @@ services:
         source: ./config/logstash/pipeline/production
         target: /usr/share/logstash/pipeline
         read_only: true
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
       - cont-net
 
@@ -161,8 +152,6 @@ services:
         source: ./config/logstash/pipeline/production
         target: /usr/share/logstash/pipeline
         read_only: true
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
       - cont-net
 
@@ -195,8 +184,6 @@ services:
         read_only: true
       # Pipeline -> put each pipeline in this folder in a separate file
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    environment:
-      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
       - cont-net
 
@@ -214,7 +201,7 @@ services:
     networks:
       - cont-net
 
-  kafka01: # if external access required expose 9092
+  kafka01: # if external access required expose 9093
     image: "bitnami/kafka:latest"
     hostname: kafka01
     restart: always
@@ -244,7 +231,7 @@ services:
     networks:
       - cont-net
   
-  kafka02: # if external access required expose 9092
+  kafka02: # if external access required expose 9094
     image: "bitnami/kafka:latest"
     hostname: kafka02
     restart: always
@@ -274,7 +261,7 @@ services:
     networks:
       - cont-net
 
-  kafka03: # if external access required expose 9092
+  kafka03: # if external access required expose 9095
     image: "bitnami/kafka:latest"
     hostname: kafka03
     restart: always

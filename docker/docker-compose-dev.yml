@@ -4,12 +4,16 @@
 #
 #   Minimal version with one instance per application- for development purpose
 #   Spark is not provided as a container - install pysapark on the local machine through pip and run 
-#
+# 
+#   To run the pipeline:
+#   docker compose -f docker/docker-compose-dev.yml up -d --build
 #   python3 spark/ann_model/src/ann_model_batch.py 
 #
 #   After docker compose starts the pipeline.
 #   Note: netsim must run on the same machine for kafka to work
 #
+#   On some host it could be required to set permission on metricbeat configuration file:
+#   chmod 644 docker/config/metricbeat/dev/metricbeat.yml
 #
 
 version: "3.8"
