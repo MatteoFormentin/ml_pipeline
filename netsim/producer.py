@@ -31,20 +31,21 @@ class Producer:
                 self.chunk_size = len(self.chunk)
             except StopIteration:
                 self.run_flag = False
+                return
 
-        else:
-            row = self.chunk[self.chunk_counter]
-            # Add timestamp of injection in unix ms
-            ms_now = round(datetime.now(
-                timezone.utc).timestamp() * 1e3)
+        
+        row = self.chunk[self.chunk_counter]
+        # Add timestamp of injection in unix ms
+        ms_now = round(datetime.now(
+            timezone.utc).timestamp() * 1e3)
 
-            row["ingestion_ms"] = ms_now
-            s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")
+        row["ingestion_ms"] = ms_now
+        s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")
 
-            self.kafka_broker.send(self.topic, value=s)
+        self.kafka_broker.send(self.topic, value=s)
 
-            self.chunk_counter += 1
-            self.counter += 1
+        self.chunk_counter += 1
+        self.counter += 1
 
     def isRunning(self):
         return self.run_flag

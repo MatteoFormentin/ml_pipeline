@@ -23,7 +23,7 @@ ENVIRONMENT = os.getenv('ENVIRONMENT')
 INDEX_NAME = "siae-pm"
 MODEL_PATH = "./ann_model.joblib"
 MODULATION_FILE_PATH = "./Project_good_modulation.csv"
-# Path to es-spark library to add Elasticsearch integration - needed only on dev, in production is automatically downloaded
+# Path to es-spark library to add Elasticsearch integration - needed only on dev, in production is passed as arg
 ES_LIB_PATH = "elasticsearch-spark-20_2.12-7.12.0.jar"
 
 # On production exploit all the parallelism - connect to all available nodes
@@ -32,6 +32,8 @@ if ENVIRONMENT == "production":
 else:
     # On development we are otside the netwrork of docker - like in a wan - we can only access the master binded on localhost:9200
     ES_HOST = "http://localhost"
+    #os.environ['PYSPARK_SUBMIT_ARGS'] = '--packages ch.cern.sparkmeasure:spark-measure_2.12:0.17 pyspark-shell'
+
 
 
 # ------------------
@@ -377,6 +379,10 @@ def calculate_latency(ingestion_ms_column):
 #   SPARK PIPELINE
 # ------------------
 while True:
+    '''stageMetrics = spark.sparkContext._jvm.ch.cern.sparkmeasure.StageMetrics(
+        spark._jsparkSession)
+    stageMetrics.begin()'''
+
     # NB: In production delete all show() else it will not work as a pipeline
     es_query = """
     {
@@ -458,3 +464,6 @@ while True:
 
     # 8 - CLEAR CACHE to prepare for next batch
     spark.catalog.clearCache()
+
+    '''stageMetrics.end()
+    stageMetrics.printReport()'''

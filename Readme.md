@@ -91,5 +91,5 @@ Note that this requires a powerful machine to run.
 6. Start a demo simulation:
 
     ``` bash
-    python3 netsim simulate "demo_links" 15.160.22.36:9093 siae-pm --interval=10 --limit=10
+    python3 netsim simulate "demo_links" pipeline_host_public_ip:9093 siae-pm --interval=10 --limit=10
     ```

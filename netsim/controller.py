@@ -23,17 +23,18 @@ class Controller():
         print(" ( /(           ) )\ )             ")
         print(" )\())   (   ( /((()/( (      )    ")
         print("((_)\   ))\  )\())/(_)))\    (     ")
-        print(" _((_) /((_)(_))/(_)) ((_)   )\  ' ")
+        print(" _((_) /((_)(_))/(_)) ((_)   )\    ")
         print("| \| |(_))  | |_ / __| (_) _((_))  ")
         print("| .` |/ -_) |  _|\__ \ | || '  \() ")
         print("|_|\_|\___|  \__||___/ |_||_|_|_|  ")
-        print("                              2021 ")
+        print("                                   ")
         print()
 
         args = self.parseArgs()
 
         if args.command == "simulate":
             print("Simulation Module v1.0")
+            print()
             self.producers = []
             self.kafka_broker = args.kafka_broker
             self.kafka_topic = args.kafka_topic
@@ -59,19 +60,22 @@ class Controller():
             print("Spawned producers: %d" % len(self.producers))
 
 
-            total_log_processed = 0
+            
             while not len(self.producers) == 0:
+                total_log_processed = 0
                 for p in self.producers:
+                    total_log_processed += p.getProcessedLogs()
                     if p.isRunning():
                         p.produceOneLog()
 
                     else:
-                        print("Producer %s finished simulation. %d logs injected.                             " %
+                        print("Producer %s finish simulation. %d logs injected.                             " %
                               (p.getProducerId(), p.getProcessedLogs()))
-                        total_log_processed +=p.getProcessedLogs()
                         self.producers.remove(p)
                         
-                print("Active producers: %d" % (len(self.producers)), end='\r')
+                print("Active producers: %d. Injected Logs: %d" %
+                      (len(self.producers), total_log_processed), end='\r')
+                
                 time.sleep(self.interval)
 
 
@@ -87,6 +91,8 @@ class Controller():
         # Check if required splitting
         elif args.command == "split":
             print("Split Module v1.0")
+            print()
+
             print("Splitting the file. It may require some time.")
             split_csv(args.input_csv, args.column_name, args.out_folder)
             print("Split done.")
