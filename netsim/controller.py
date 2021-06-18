@@ -64,14 +64,15 @@ class Controller():
             while not len(self.producers) == 0:
                 total_log_processed = 0
                 for p in self.producers:
-                    total_log_processed += p.getProcessedLogs()
                     if p.isRunning():
                         p.produceOneLog()
+                        total_log_processed += p.getProcessedLogs()
 
                     else:
                         print("Producer %s finish simulation. %d logs injected.                             " %
                               (p.getProducerId(), p.getProcessedLogs()))
                         self.producers.remove(p)
+
                         
                 print("Active producers: %d. Injected Logs: %d" %
                       (len(self.producers), total_log_processed), end='\r')

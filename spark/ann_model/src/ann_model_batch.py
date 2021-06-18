@@ -403,8 +403,13 @@ while True:
     # Also add id column retrived from metadata in order to update es spark_processed col
     reader = spark.read.format("org.elasticsearch.spark.sql").option("es.query", es_query).option("es.read.metadata", "true").option(
         "es.nodes.wan.only", "true").option("es.port", "9200").option("es.net.ssl", "false").option("es.nodes", ES_HOST)  # .option("es.nodes.resolve.hostname", "false")
-    df = reader.load(INDEX_NAME).withColumn("id", F.element_at(F.col(
-        "_metadata"), "_id")).orderBy(F.col("data").asc()).drop("prediction").drop("latency")  # drop prediction: when old prediction must be kept null is provided in the new prediction col - this will NOT delete the old predictions from es
+    
+    try:
+        df = reader.load(INDEX_NAME).withColumn("id", F.element_at(F.col(
+            "_metadata"), "_id")).orderBy(F.col("data").asc()).drop("prediction").drop("latency")  # drop prediction: when old prediction must be kept null is provided in the new prediction col - this will NOT delete the old predictions from es
+    except Exception:
+        print("Cluster not ready or index not initialised.")
+        continue
 
     # 2 - FILTER groups that have less than 3 logs inside
     # Add a new column group_count that contains the number of rows for each group idlink, ramo
