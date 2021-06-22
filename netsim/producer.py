@@ -14,7 +14,7 @@ class Producer:
         self.topic = topic
         self.interval = interval
         self.counter = 0
-        self.reader = iter(pd.read_csv(self.csv_path, chunksize=CHUNKSIZE))
+        self.reader = iter(pd.read_csv(self.csv_path, chunksize=CHUNKSIZE, sep=";"))
         self.chunk = None
         self.chunk_counter = 0
         self.chunk_size = 0
@@ -39,7 +39,9 @@ class Producer:
         ms_now = round(datetime.now(
             timezone.utc).timestamp() * 1e3)
 
+        row["idlink"] = int(self.producer_id)
         row["ingestion_ms"] = ms_now
+
         s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")
 
         self.kafka_broker.send(self.topic, value=s)

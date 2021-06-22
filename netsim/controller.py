@@ -40,6 +40,8 @@ class Controller():
             self.kafka_topic = args.kafka_topic
             self.input_folder = args.input_folder
             self.interval = args.interval
+            self.finished_log_processed = 0
+            self.batch_counter=1
             starting_time = datetime.datetime.now()
             if args.limit:
                 self.limit = args.limit
@@ -51,45 +53,46 @@ class Controller():
                 self.kafka_broker = KafkaProducer(
                     bootstrap_servers=[self.kafka_broker], acks="all")
                 print("Connected to Kafka")
-            except kafka.errors:
-                print("No kafka brokers available. Retry.")
+            except Exception:
+                print("No kafka brokers available, maybe wrong IP address?. Retry.")
                 sys.exit(-1)
 
-            print("Spawning producers...")
             self.runProducers()
-            print("Spawned producers: %d" % len(self.producers))
+            print("Created %d producers                                                          " % len(self.producers))
 
+            try:
+                while not len(self.producers) == 0:
+                    batch_log_processed = 0
+                    prod_counter = 0
+                    for p in self.producers:
+                        if p.isRunning():
+                            p.produceOneLog()
+                            batch_log_processed += p.getProcessedLogs()
 
-            
-            while not len(self.producers) == 0:
-                total_log_processed = 0
+                        else:
+                            print("Producer %d finish simulation. %d logs injected.                             " %
+                                  (p.getProducerId(), p.getProcessedLogs()))
+                            self.finished_log_processed += p.getProcessedLogs()
+
+                            self.producers.remove(p)
+
+                        prod_counter+=1
+
+                        self.printProgressBar(
+                            prod_counter, len(self.producers), "Publishing batch %d " % (self.batch_counter), length=50)
+
+                    print("Active producers: %d. Total injected logs: %d. Pausing until next batch.                                                          " %
+                          (len(self.producers), batch_log_processed), end='\r')
+                    self.batch_counter+=1 
+                    time.sleep(self.interval)
+
+            except KeyboardInterrupt:
                 for p in self.producers:
                     if p.isRunning():
-                        p.produceOneLog()
-                        total_log_processed += p.getProcessedLogs()
+                        self.finished_log_processed += p.getProcessedLogs()
 
-                    else:
-                        print("Producer %s finish simulation. %d logs injected.                             " %
-                              (p.getProducerId(), p.getProcessedLogs()))
-                        self.producers.remove(p)
+            self.printStats(starting_time, self.finished_log_processed)
 
-                        
-                print("Active producers: %d. Injected Logs: %d" %
-                      (len(self.producers), total_log_processed), end='\r')
-                
-                time.sleep(self.interval)
-
-
-            # Calculate time elapsed
-            s = (datetime.datetime.now() - starting_time).seconds
-            hours = s // 3600
-            s = s - (hours * 3600)
-            minutes = s // 60
-            seconds = s - (minutes * 60)
-            print("Simulation done. Injected %s Logs. Took %d hours %d minutes %d seconds                                     " % (
-                total_log_processed, hours, minutes, seconds))
-
-        # Check if required splitting
         elif args.command == "split":
             print("Split Module v1.0")
             print()
@@ -143,20 +146,62 @@ class Controller():
 
     def runProducers(self):
         spawned_count = 0
-        for path in os.listdir(self.input_folder):
-            full_path = os.path.join(self.input_folder, path)
-            if os.path.isfile(full_path) and full_path.endswith(".csv"):
-                producer_id = path.split(".")[0]
+        folder = os.listdir(self.input_folder)
+        total_to_spawn = len(folder)
+        try:
+            for path in folder:
+                full_path = os.path.join(self.input_folder, path)
+                if os.path.isfile(full_path) and full_path.endswith(".csv") and not full_path.startswith("."):
+                    producer_id = int(path.split(".")[0])
 
-                p = Producer(producer_id, full_path, self.kafka_broker,
-                             self.kafka_topic, self.interval)
-                self.producers.append(p)
-                spawned_count += 1
-                if spawned_count >= self.limit:
-                    break
+                    p = Producer(producer_id, full_path, self.kafka_broker,
+                                self.kafka_topic, self.interval)
+                    self.producers.append(p)
+                    spawned_count += 1
+                    if spawned_count >= self.limit:
+                        break
+
+                self.printProgressBar(
+                    spawned_count, total_to_spawn, "Creating producers ", length=50)
+        except KeyboardInterrupt:
+            print()
+            print("Aborted. Exiting.")
+            sys.exit()
 
     def areJobsTerminated(self):
         for p in self.producers:
             if p.isRunning():
                 return False
         return True
+
+    def printStats(self, starting_time, log_processed):
+        # Calculate time elapsed
+        s = (datetime.datetime.now() - starting_time).seconds
+        hours = s // 3600
+        s = s - (hours * 3600)
+        minutes = s // 60
+        seconds = s - (minutes * 60)
+        print("Simulation done. Injected %s Logs. Took %d hours %d minutes %d seconds                                     " % (
+            log_processed, hours, minutes, seconds))
+
+    def printProgressBar(self, iteration, total, prefix='', suffix='', decimals=1, length=100, printEnd="\r"):
+        """
+        Call in a loop to create terminal progress bar
+        @params:
+            iteration   - Required  : current iteration (Int)
+            total       - Required  : total iterations (Int)
+            prefix      - Optional  : prefix string (Str)
+            suffix      - Optional  : suffix string (Str)
+            decimals    - Optional  : positive number of decimals in percent complete (Int)
+            length      - Optional  : character length of bar (Int)
+            fill        - Optional  : bar fill character (Str)
+            printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
+        """
+        percent = ("{0:." + str(decimals) + "f}").format(100 *
+                                                        (iteration / float(total)))
+        filledLength = int(length * iteration // total)
+        bar = "=" * (filledLength -1) + '>' + ' ' * (length - filledLength)
+        print(f'\r{prefix} [{bar}] {percent}% {suffix}', end=printEnd)
+        # Print New Line on Complete
+        if iteration == total:
+            print()
