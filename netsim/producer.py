@@ -39,7 +39,9 @@ class Producer:
         ms_now = round(datetime.now(
             timezone.utc).timestamp() * 1e3)
 
+
         row["idlink"] = int(self.producer_id)
+        print(row["idlink"])
         row["ingestion_ms"] = ms_now
 
         s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")

@@ -148,6 +148,7 @@ class Controller():
         spawned_count = 0
         folder = os.listdir(self.input_folder)
         total_to_spawn = len(folder)
+        folder.sort()
         try:
             for path in folder:
                 full_path = os.path.join(self.input_folder, path)
