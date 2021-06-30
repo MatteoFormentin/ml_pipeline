@@ -58,7 +58,7 @@ class Controller():
                 sys.exit(-1)
 
             self.runProducers()
-            print("Created %d producers                                                          " % len(
+            print("Created %d producers                                                                  " % len(
                 self.producers))
 
             try:
@@ -82,8 +82,8 @@ class Controller():
                         self.printProgressBar(
                             prod_counter, len(self.producers), "Publishing batch %d " % (self.batch_counter), length=50)
 
-                    print("Active producers: %d. Total injected logs: %d. Pausing until next batch.                                                          " %
-                          (len(self.producers), batch_log_processed), end='\r')
+                    print("Batch %d done. Active producers: %d. Total injected logs: %d. Pausing until next batch.                                                          " %
+                          (self.batch_counter, len(self.producers), batch_log_processed), end='\r')
                     self.batch_counter += 1
                     time.sleep(self.interval)
 
@@ -205,5 +205,5 @@ class Controller():
         bar = "=" * (filledLength - 1) + '>' + ' ' * (length - filledLength)
         print(f'\r{prefix} [{bar}] {percent}% {suffix}', end=printEnd)
         # Print New Line on Complete
-        if iteration == total:
-            print()
+        #if iteration == total:
+        #    print()
