@@ -41,7 +41,7 @@ class Controller():
             self.input_folder = args.input_folder
             self.interval = args.interval
             self.finished_log_processed = 0
-            self.batch_counter=1
+            self.batch_counter = 1
             starting_time = datetime.datetime.now()
             if args.limit:
                 self.limit = args.limit
@@ -58,7 +58,8 @@ class Controller():
                 sys.exit(-1)
 
             self.runProducers()
-            print("Created %d producers                                                          " % len(self.producers))
+            print("Created %d producers                                                          " % len(
+                self.producers))
 
             try:
                 while not len(self.producers) == 0:
@@ -76,14 +77,14 @@ class Controller():
 
                             self.producers.remove(p)
 
-                        prod_counter+=1
+                        prod_counter += 1
 
                         self.printProgressBar(
                             prod_counter, len(self.producers), "Publishing batch %d " % (self.batch_counter), length=50)
 
                     print("Active producers: %d. Total injected logs: %d. Pausing until next batch.                                                          " %
                           (len(self.producers), batch_log_processed), end='\r')
-                    self.batch_counter+=1 
+                    self.batch_counter += 1
                     time.sleep(self.interval)
 
             except KeyboardInterrupt:
@@ -145,25 +146,25 @@ class Controller():
         return self.parser.parse_args()
 
     def runProducers(self):
-        spawned_count = 0
+        spawned_count = 1
         folder = os.listdir(self.input_folder)
-        total_to_spawn = len(folder)
         folder.sort()
+
         try:
             for path in folder:
                 full_path = os.path.join(self.input_folder, path)
                 if os.path.isfile(full_path) and full_path.endswith(".csv") and not full_path.startswith("."):
                     producer_id = int(path.split(".")[0])
-
-                    p = Producer(producer_id, full_path, self.kafka_broker,
-                                self.kafka_topic, self.interval)
+                    p = Producer(producer_id, full_path,
+                                 self.kafka_broker, self.kafka_topic)
                     self.producers.append(p)
                     spawned_count += 1
-                    if spawned_count >= self.limit:
+                    if spawned_count > self.limit:
                         break
 
                 self.printProgressBar(
-                    spawned_count, total_to_spawn, "Creating producers ", length=50)
+                   spawned_count, self.limit, "Creating producers ", length=50)
+
         except KeyboardInterrupt:
             print()
             print("Aborted. Exiting.")
@@ -199,9 +200,9 @@ class Controller():
             printEnd    - Optional  : end character (e.g. "\r", "\r\n") (Str)
         """
         percent = ("{0:." + str(decimals) + "f}").format(100 *
-                                                        (iteration / float(total)))
+                                                         (iteration / float(total)))
         filledLength = int(length * iteration // total)
-        bar = "=" * (filledLength -1) + '>' + ' ' * (length - filledLength)
+        bar = "=" * (filledLength - 1) + '>' + ' ' * (length - filledLength)
         print(f'\r{prefix} [{bar}] {percent}% {suffix}', end=printEnd)
         # Print New Line on Complete
         if iteration == total:

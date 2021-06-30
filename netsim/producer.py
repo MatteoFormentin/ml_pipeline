@@ -1,5 +1,4 @@
 import pandas as pd
-from threading import Thread
 from datetime import datetime, timezone
 import simplejson
 
@@ -7,12 +6,11 @@ CHUNKSIZE = 10
 
 
 class Producer:
-    def __init__(self, producer_id, csv_path, kafka_broker, topic, interval):
+    def __init__(self, producer_id, csv_path, kafka_broker, topic):
         self.run_flag = True
         self.producer_id = producer_id
         self.csv_path = csv_path
         self.topic = topic
-        self.interval = interval
         self.counter = 0
         self.reader = iter(pd.read_csv(self.csv_path, chunksize=CHUNKSIZE, sep=";"))
         self.chunk = None
@@ -23,7 +21,6 @@ class Producer:
         self.kafka_broker = kafka_broker
 
     def produceOneLog(self):
-
         if self.chunk_counter >= self.chunk_size:
             try:
                 self.chunk = next(self.reader).to_dict("records")
@@ -33,19 +30,15 @@ class Producer:
                 self.run_flag = False
                 return
 
-        
         row = self.chunk[self.chunk_counter]
         # Add timestamp of injection in unix ms
         ms_now = round(datetime.now(
             timezone.utc).timestamp() * 1e3)
 
-
-        row["idlink"] = int(self.producer_id)
-        print(row["idlink"])
+        row["idlink"] = self.producer_id
         row["ingestion_ms"] = ms_now
 
         s = simplejson.dumps(row, ignore_nan=True).encode("utf-8")
-
         self.kafka_broker.send(self.topic, value=s)
 
         self.chunk_counter += 1
