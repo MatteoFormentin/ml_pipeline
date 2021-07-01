@@ -62,7 +62,7 @@ services:
       - type: bind
         source: ./config/logstash/pipeline/dev
         target: /usr/share/logstash/pipeline
-        read_only: true
+        read_only: true  
     environment:
       LS_JAVA_OPTS: "-Xmx256m -Xms256m"
     networks:
