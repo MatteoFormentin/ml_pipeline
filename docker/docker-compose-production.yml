@@ -118,12 +118,6 @@ services:
         source: ./config/logstash/pipeline/production
         target: /usr/share/logstash/pipeline
         read_only: true
-      # Script to add kfka latency
-      - type: bind
-      source: ./config/logstash/pipeline/kafka_latency.rb
-      target: /usr/share/logstash/pipeline/kafka_latency.rb
-      read_only: true
-
     networks:
       - cont-net
 
@@ -142,11 +136,6 @@ services:
         source: ./config/logstash/pipeline/production
         target: /usr/share/logstash/pipeline
         read_only: true
-      # Script to add kfka latency
-      - type: bind
-      source: ./config/logstash/pipeline/kafka_latency.rb
-      target: /usr/share/logstash/pipeline/kafka_latency.rb
-      read_only: true
     networks:
       - cont-net
   
@@ -165,11 +154,6 @@ services:
         source: ./config/logstash/pipeline/production
         target: /usr/share/logstash/pipeline
         read_only: true
-      # Script to add kfka latency
-      - type: bind
-      source: ./config/logstash/pipeline/kafka_latency.rb
-      target: /usr/share/logstash/pipeline/kafka_latency.rb
-      read_only: true
     networks:
       - cont-net
 
