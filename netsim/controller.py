@@ -151,10 +151,10 @@ class Controller():
         folder.sort()
 
         try:
-            for path in folder:
-                full_path = os.path.join(self.input_folder, path)
-                if os.path.isfile(full_path) and full_path.endswith(".csv") and not full_path.startswith("."):
-                    producer_id = int(path.split(".")[0])
+            for file_name in folder:
+                full_path = os.path.join(self.input_folder, file_name)
+                if os.path.isfile(full_path) and file_name.endswith(".csv") and not file_name.startswith("."):
+                    producer_id = int(file_name.split(".")[0])
                     p = Producer(producer_id, full_path,
                                  self.kafka_broker, self.kafka_topic)
                     self.producers.append(p)

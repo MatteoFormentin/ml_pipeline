@@ -2,7 +2,7 @@ import pandas as pd
 from datetime import datetime, timezone
 import simplejson
 
-CHUNKSIZE = 10
+CHUNKSIZE = 20
 
 
 class Producer:
