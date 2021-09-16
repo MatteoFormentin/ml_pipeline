@@ -10,8 +10,6 @@ import datetime
 from csv_splitter import split_csv
 from producer import Producer
 
-REFRESH_RATE = 1
-
 
 class Controller():
     def __init__(self):
@@ -49,6 +47,7 @@ class Controller():
                 self.limit = -1
 
             try:
+                # Create Kafka connection
                 print("Connecting to Kafka...")
                 self.kafka_broker = KafkaProducer(
                     bootstrap_servers=[self.kafka_broker], acks="all")
@@ -57,14 +56,17 @@ class Controller():
                 print("No kafka brokers available, maybe wrong IP address?. Retry.")
                 sys.exit(-1)
 
+            # Create log producers classes
             self.runProducers()
             print("Created %d producers                                                                  " % len(
                 self.producers))
 
             try:
+                # Check if there are still log producer acrive
                 while not len(self.producers) == 0:
                     batch_log_processed = 0
                     prod_counter = 0
+                    #Send one log to the pipeline one log foreach producer
                     for p in self.producers:
                         if p.isRunning():
                             p.produceOneLog()
@@ -75,10 +77,12 @@ class Controller():
                                   (p.getProducerId(), p.getProcessedLogs()))
                             self.finished_log_processed += p.getProcessedLogs()
 
+                            # If the producer has no more log in the csv, stop and remove it
                             self.producers.remove(p)
 
                         prod_counter += 1
 
+                        # Print an awesome progress bar on the terminal
                         self.printProgressBar(
                             prod_counter, len(self.producers), "Publishing batch %d " % (self.batch_counter), length=50)
 
@@ -87,6 +91,7 @@ class Controller():
                     self.batch_counter += 1
                     time.sleep(self.interval)
 
+            #Stop if ctrl+c
             except KeyboardInterrupt:
                 for p in self.producers:
                     if p.isRunning():
@@ -94,6 +99,7 @@ class Controller():
 
             self.printStats(starting_time, self.finished_log_processed)
 
+        # Run CSV splitter
         elif args.command == "split":
             print("Split Module v1.0")
             print()
@@ -108,6 +114,8 @@ class Controller():
             self.parser.print_help()
 
     def parseArgs(self):
+        # Parse command line argument
+
         self.parser = argparse.ArgumentParser(
             description="Utilities to handle and simulate logs producer")
 
@@ -146,6 +154,7 @@ class Controller():
         return self.parser.parse_args()
 
     def runProducers(self):
+        #Load csv file from the provided path and create one producer class foreach file
         spawned_count = 1
         folder = os.listdir(self.input_folder)
         folder.sort()
@@ -163,7 +172,7 @@ class Controller():
                         break
 
                 self.printProgressBar(
-                   spawned_count, self.limit, "Creating producers ", length=50)
+                    spawned_count, self.limit, "Creating producers ", length=50)
 
         except KeyboardInterrupt:
             print()
@@ -205,5 +214,5 @@ class Controller():
         bar = "=" * (filledLength - 1) + '>' + ' ' * (length - filledLength)
         print(f'\r{prefix} [{bar}] {percent}% {suffix}', end=printEnd)
         # Print New Line on Complete
-        #if iteration == total:
+        # if iteration == total:
         #    print()

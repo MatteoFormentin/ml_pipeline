@@ -1,6 +1,7 @@
 import pandas as pd
 import os.path
 
+# Split multiple id CSV file into one file foreach id
 
 chunksize = 10000  # Amount of line of CSV loaded in memory
 
