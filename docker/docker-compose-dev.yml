@@ -94,7 +94,7 @@ services:
         source: ./config/metricbeat/dev/metricbeat.yml
         target: /usr/share/metricbeat/metricbeat.yml
         read_only: true
-      # Pipeline -> put each pipeline in this folder in a separate file
+      # Mount docker socket into the container for monitoring
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       LS_JAVA_OPTS: "-Xmx256m -Xms256m"
@@ -121,18 +121,24 @@ services:
     restart: always
     environment:
       - KAFKA_BROKER_ID=1
+      # In order to use internal and external clients to access Kafka brokers you need
+      # to configure one listener for each kind of clients.
+      # Internal: kafka01:9092 change CLIENT://kafka01:9092
+      # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
-      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093
+      - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9093 
       - KAFKA_CFG_ADVERTISED_LISTENERS=CLIENT://kafka:9092,EXTERNAL://localhost:9093
       - KAFKA_INTER_BROKER_LISTENER_NAME=CLIENT
+      # Zookeeper address
       - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      # Run Kafka with Jolokia enabled for metrics collections
       - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
     volumes:
       - kafka-data:/bitnami/kafka
       - type: bind
-        source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External var needed to collect metrics
+        source: ./config/kafka/jolokia-jvm-1.6.1-agent.jar # External jar needed to collect metrics
         target: /usr/share/jolokia-jvm-1.6.1-agent.jar
     ports:
       - "9093:9093"

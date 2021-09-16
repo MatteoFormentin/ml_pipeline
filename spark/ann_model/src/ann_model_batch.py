@@ -379,9 +379,6 @@ def calculate_latency(ingestion_ms_column):
 #   SPARK PIPELINE
 # ------------------
 while True:
-    '''stageMetrics = spark.sparkContext._jvm.ch.cern.sparkmeasure.StageMetrics(
-        spark._jsparkSession)
-    stageMetrics.begin()'''
 
     # NB: In production delete all show() else it will not work as a pipeline
     es_query = """
@@ -469,6 +466,3 @@ while True:
 
     # 8 - CLEAR CACHE to prepare for next batch
     spark.catalog.clearCache()
-
-    '''stageMetrics.end()
-    stageMetrics.printReport()'''

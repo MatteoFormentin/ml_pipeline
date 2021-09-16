@@ -1,4 +1,7 @@
 #! bin/bash
+
+# Script to run Spark in master or worker mode based on docker envs
+
 if [ "$SPARK_MODE" == "master" ];
 then
     /opt/spark/sbin/start-master.sh

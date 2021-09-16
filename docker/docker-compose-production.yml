@@ -5,6 +5,7 @@
 #   Before running this, set PUBLIC_IP env with the public ip address of the machine
 #   to make Kafka cluster listen on the machine ip: before running the pipeline create
 #   a .env file with as content PUBLIC_IP=host_public_ip in the root of the repo
+#  
 #
 #   On some host it could be required to set permission on metricbeat configuration file:
 #   chmod 644 docker/config/metricbeat/production/metricbeat.yml
@@ -12,6 +13,8 @@
 #
 #   To run the pipeline:
 #   docker-compose -f  docker/docker-compose-production.yml  --env-file .env up -d --build
+#
+#   Else use run_production.sh script that performs all the operations automatically
 #
 
 
@@ -222,6 +225,7 @@ services:
       - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
       - KAFKA_OPTS=-javaagent:/usr/share/jolokia-jvm-1.6.1-agent.jar=port=8778,host=0.0.0.0
       - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=3
+      # Create 3 partitions for each topics - this should match te number of logstash instances
       - KAFKA_CFG_NUM_PARTITIONS=3
     volumes:
       - kafka01-data:/bitnami/kafka
@@ -243,6 +247,10 @@ services:
       # to configure one listener for each kind of clients.
       # Internal: kafka01:9092 change CLIENT://kafka01:9092
       # External: localhost:9093 change if IP public EXTERNAL://localhost:9093
+
+      # PUBLIC_IP env is needed for kafka listeners - should match external ip address where pipeline is reachable
+      # value is provided by run production script
+
       - ALLOW_PLAINTEXT_LISTENER=yes
       - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       - KAFKA_CFG_LISTENERS=CLIENT://:9092,EXTERNAL://:9094

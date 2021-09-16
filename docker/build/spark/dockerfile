@@ -1,24 +1,32 @@
+# Build Spark images with pipeline python dependancies
 FROM python:slim
 
 RUN mkdir /usr/share/man/man1/
+
+# Install Spark dependancies
 RUN apt-get update \
     && apt-get install -y default-jre scala git wget procps bash \
     && apt-get clean 
 
+# Download and install Spark
 RUN wget https://downloads.apache.org/spark/spark-3.1.1/spark-3.1.1-bin-hadoop2.7.tgz
 RUN tar xvf spark-*
 RUN mv spark-3.1.1-bin-hadoop2.7 /opt/spark
 
+# Seth path var
 RUN echo "export SPARK_HOME=/opt/spark" >> ~/.profile \
     && echo "export PATH=$PATH:$SPARK_HOME/bin:$SPARK_HOME/sbin" >> ~/.profile \
     && echo "export PYSPARK_PYTHON=/usr/bin/python3" >> ~/.profile 
 
+# Install python dependancies for the pipeline
 RUN pip3 install scikit-learn joblibspark pandas pyarrow
 
+# Expose Spark ports
 EXPOSE 7077
 EXPOSE 8080
 EXPOSE 8081
 
+# Copy run script for Spark 
 RUN mkdir scripts
 COPY run.sh ./scripts
 RUN chmod +x ./scripts/run.sh

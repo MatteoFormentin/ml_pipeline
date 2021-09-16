@@ -8,6 +8,8 @@ monitoring:
   enabled: true
 
 metricbeat.modules:
+
+  # Docker monitoring
   - module: docker
     metricsets:
       - "container"
@@ -22,11 +24,13 @@ metricbeat.modules:
     period: 10s
     enabled: false
 
+    # Elasticsearch monitor
   - module: elasticsearch
     xpack.enabled: true
     period: 10s
     hosts: ["http://es:9200"]
 
+  # Logstash monitor
   - module: logstash
     metricsets:
       - node
@@ -35,6 +39,7 @@ metricbeat.modules:
     hosts: ["ls:9600"]
     xpack.enabled: true
 
+  # Kibana monitor
   - module: kibana
     metricsets:
       - stats
@@ -42,12 +47,14 @@ metricbeat.modules:
     hosts: ["kib:5601"]
     xpack.enabled: true
 
+  # Zookeeper monitor
   - module: zookeeper
     enabled: true
     metricsets: ["mntr", "server"]
     period: 10s
     hosts: ["zookeeper:2181"]
 
+  # Kafka monitor
   - module: kafka
     metricsets:
       - consumergroup
@@ -66,6 +73,7 @@ metricbeat.modules:
     hosts: ["kafka:8778"]
 
 output:
+  # Save metrics in a dedicated es index
   elasticsearch:
     hosts: ["es:9200"]
     ilm.enabled: true
