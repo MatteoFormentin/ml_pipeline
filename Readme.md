@@ -1,6 +1,5 @@
 # Design and implementation of a software pipeline for machine learning on streaming data
-
-## *Msc Thesis in Computer Science and Enginnering of Matteo Formentin, Politecnico di Milano, 2021*
+*Master Thesis in Computer Science and Engineering, Politecnico di Milano, 2021*
 
 ## Getting started
 
