@@ -2,8 +2,6 @@
 
 ## *Msc Thesis in Computer Science and Enginnering of Matteo Formentin, Politecnico di Milano, 2021*
 
-<br>
-
 ## Getting started
 
 ### Folder structure of the source repo
