@@ -1,4 +1,5 @@
 # Design and implementation of a software pipeline for machine learning on streaming data
+
 *Master Thesis in Computer Science and Engineering, Politecnico di Milano, 2021*
 
 ## Getting started
@@ -18,6 +19,7 @@ The repository folders are organised as it follows:
 * spark: Contains the source of the Spark application developed to handle the classification in the pipeline with the corresponding dockerfile.
 
 ### Docker compose file
+
 The docker-compose file contains the specification of all the containers that the engine should create to run the pipeline. Each container is an entry on the file along with its configuration. The most important are:
 
 * image or build: Specify the image to run the container. If image is used the corresponding image is downloaded from the docker registry, if build is used the provided dockerfile is built.
@@ -28,7 +30,7 @@ The docker-compose file contains the specification of all the containers that th
 
 * ports: Defines the port forwarding in the format host_port:container_port for external access. 
 
-* scale: number of containers to run from that image, default is one. Supported only by spark-worker. When other instances of the same application requires a different configuration a new entry in the compose file with the proper configuration should be provided. Also, when a pipeline application is scaled remember to add to the Metricbeat configuration the new containers to monitor.
+* scale: number of containers to run from that image, default is one. Supported only by spark-worker. When other instances of the same application require a different configuration a new entry in the compose file with the proper configuration should be provided. Also, when a pipeline application is scaled remember to add to the Metricbeat configuration the new containers to monitor.
 
 We provide two docker-compose files:
 
@@ -56,63 +58,63 @@ The following containers are defined inside the production file:
 
 * spark-driver: Spark Driver. Runs the application that executes the machine learning models.
 
-Spark images are build since they are not available from the registry, while the others are downloaded on the first run. In the development version, the same containers are defined without the final progressive number and Spark cluster is not provided for performance reasons.
+Spark images are build since they are not available from the registry, while the others are downloaded on the first run. In the development version, the same containers are defined without the final progressive number and the Spark cluster is not provided for performance reasons.
 
 ### Run in production
 
-Run the pipeline in production mode. This runs all the application in cluster mode, enabling replication. 
+Run the pipeline in production mode. This runs all the applications in cluster mode, enabling replication. 
 Note that this requires a powerful machine to run.
 
 1. Clone this repo on the host machine and change the working directory inside:
 
-    ``` bash
-    git pull https://github.com/MatteoFormentin/ml_pipeline
-    cd ml_pipeline
-    ```
+ ``` bash
+ git pull https://github.com/MatteoFormentin/ml_pipeline
+ cd ml_pipeline
+ ```
 
 2. Provision the host machine and start the pipeline: 
 
     * If using AWS Ubuntu Image or a Linux machine, run:
 
-        ``` bash
-        sudo bash script/aws_provision.sh
-        ```
+    ``` bash
+    sudo bash script/aws_provision.sh
+    ```
 
-        This will automatically provision a clean machine by installing Docker and performing some configuration, downloading images and finally starts the pipeline. From now, to run again the pipeline:
+    This will automatically provision a clean machine by installing Docker and performing some configuration, downloading images and finally starts the pipeline. From now, to run again the pipeline:
 
-        ``` bash
-        sudo bash script/run_production.sh
-        ```
+    ``` bash
+    sudo bash script/run_production.sh
+    ```
 
-        To stop the pipeline:
+    To stop the pipeline:
 
-        ``` bash
-        sudo docker-compose -f docker/docker-compose-production.yml down
-        ```
+    ``` bash
+    sudo docker-compose -f docker/docker-compose-production.yml down
+    ```
 
     * On other operating systems, manual setup is required:
 
-        * Install docker and docker-compose. See docker documentation for instructions.
+    * Install docker and docker-compose. See docker documentation for instructions.
 
-        * Modify permissions of Metricbeat configuration file:
+    * Modify permissions of Metricbeat configuration file:
 
-        ``` bash
-        chmod 644 docker/config/metricbeat/production/metricbeat.yml
-        ```
+    ``` bash
+    chmod 644 docker/config/metricbeat/production/metricbeat.yml
+    ```
 
-        * Create a .env file with the followng content:
+    * Create a .env file with the following content:
 
-        ``` bash
-        PUBLIC_IP=pipeline_host_public_ip
-        ```
+    ``` bash
+    PUBLIC_IP=pipeline_host_public_ip
+    ```
 
-        Where pipeline_host_public_ip must be the public reachable IP address of the pipeline host if netsim and the pipeline run on different networks, a private IP if on the same subnet, or localhost if both on the same machine.
+    Where pipeline_host_public_ip must be the public reachable IP address of the pipeline host if netsim and the pipeline run on different networks, a private IP if on the same subnet, or localhost if both on the same machine.
 
-        * Run the pipeline:
+    * Run the pipeline:
 
-        ``` bash
-        docker-compose -f docker/docker-compose-production.yml --env-file .env up -d --build
-        ```
+    ``` bash
+    docker-compose -f docker/docker-compose-production.yml --env-file .env up -d --build
+    ```
 
 3. Install the requirement for netsim:
 
@@ -120,9 +122,9 @@ Note that this requires a powerful machine to run.
 
     * Install required packages:
 
-        ``` bash
-        pip install -r netsim/requirements.txt
-        ```
+    ``` bash
+    pip install -r netsim/requirements.txt
+    ```
 
 4. Import the dashboards inside Kibana:
 
@@ -144,26 +146,26 @@ Note that this requires a powerful machine to run.
 
 6. Start a demo simulation:
 
-    ``` bash
-    python3 netsim simulate "demo_links" pipeline_host_public_ip:9093 siae-pm --interval=10 --limit=10
-    ```
+ ``` bash
+ python3 netsim simulate "demo_links" pipeline_host_public_ip:9093 siae-pm --interval=10 --limit=10
+ ```
 
 ### Run in development
 
 1. Clone this repo on the host machine and change the working directory inside:
 
-    ``` bash
-    git pull https://github.com/MatteoFormentin/ml_pipeline
-    cd ml_pipeline
-    ```
+ ``` bash
+ git pull https://github.com/MatteoFormentin/ml_pipeline
+ cd ml_pipeline
+ ```
 
-2. Install requiremets and start the pipeline and the local Spark install: 
+2. Install requirements and start the pipeline and the local Spark install: 
 
-    ``` bash
-    pip install pyspark
-    docker compose -f docker/docker-compose-dev.yml up -d --build
-    python3 spark/ann_model/src/ann_model_batch.py 
-    ```
+ ``` bash
+ pip install pyspark
+ docker compose -f docker/docker-compose-dev.yml up -d --build
+ python3 spark/ann_model/src/ann_model_batch.py 
+ ```
 
 3. Install the requirement for netsim:
 
@@ -171,9 +173,9 @@ Note that this requires a powerful machine to run.
 
     * Install required packages:
 
-        ``` bash
-        pip install -r netsim/requirements.txt
-        ```
+    ``` bash
+    pip install -r netsim/requirements.txt
+    ```
 
 4. Import the dashboards inside Kibana:
 
@@ -195,9 +197,9 @@ Note that this requires a powerful machine to run.
 
 6. Start a demo simulation:
 
-    ``` bash
-    python3 netsim simulate "demo_links" pipeline_host_public_ip:9093 siae-pm --interval=10 --limit=10
-    ```
+ ``` bash
+ python3 netsim simulate "demo_links" pipeline_host_public_ip:9093 siae-pm --interval=10 --limit=10
+ ```
 
 ## Run custom simulation with Netsim
 
@@ -221,10 +223,11 @@ Historical logs from the radio network are exported as a unique file with log or
 python3 netsim split input_csv out_folder column_name
 
 * split: Run netsim in split mode.
-* input_csv: Path to input file to split.
-* out_folder: Path to folder where split files are saved
+* input_csv: Path to the input file to split.
+* out_folder: Path to the folder where split files are saved
 * column_name: Name of the column that identifies the link. For SIAE-PM dataset use idlink.
 
 ### Run simulation
 
-After splitting, the simulation can be started using simulate mode providing the out_folder as source.
+After splitting, the simulation can be started using simulate mode providing the out_folder as the source.
+
